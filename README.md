@@ -7,6 +7,7 @@ A Chrome and Firefox extension for the new Reddit layout (www.reddit.com). Read 
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Notes and limits](#notes-and-limits)
 - [Development](#development)
+- [License](#license)
 
 ## Install
 
@@ -108,4 +109,6 @@ See [CLAUDE.md](CLAUDE.md) for how the pieces fit together and the rules to keep
 2. Run `npm run build` and `npm test`.
 3. Attach `dist/reddit-better-browsing-chrome.zip` and `dist/reddit-better-browsing-firefox.zip` to a GitHub release.
 
-hls.js is bundled under its own license (`src/vendor/hls.LICENSE`).
+## License
+
+[MIT](LICENSE). hls.js is bundled under its own license (`src/vendor/hls.LICENSE`).
