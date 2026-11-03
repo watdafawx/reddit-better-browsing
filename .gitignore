@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# old prebuilt copies (now produced by `npm run build` into dist/)
+/reddit-better-browsing-chrome/
+/reddit-better-browsing-firefox/
+/reddit-better-browsing-*.zip

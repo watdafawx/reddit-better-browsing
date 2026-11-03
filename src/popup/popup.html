@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reddit Better Browsing</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <img src="../icons/icon48.png" alt="" width="22" height="22">
+  <h1>Reddit Better Browsing</h1>
+  <span id="saved" class="saved">Saved</span>
+</header>
+<nav id="tabs">
+  <button data-tab="viewer" class="on">Posts</button>
+  <button data-tab="media">Images</button>
+  <button data-tab="video">Video</button>
+  <button data-tab="filters">Filters</button>
+  <button data-tab="look">Look</button>
+  <button data-tab="accounts">Accounts</button>
+</nav>
+
+<main>
+<section data-panel="viewer" class="on">
+  <label class="row">Open posts in
+    <select data-key="viewerMode">
+      <option value="side">Side panel</option>
+      <option value="modal">Centered modal</option>
+      <option value="lightbox">Lightbox (full screen, wheel = next post)</option>
+      <option value="inline">Expand inline</option>
+      <option value="off">Off (normal Reddit)</option>
+    </select>
+  </label>
+  <label class="row">Side panel width <span><input type="range" min="25" max="85" data-key="sideWidth"><output></output>%</span></label>
+  <label class="row">Comment sort
+    <select data-key="commentSort">
+      <option value="confidence">Best</option><option value="top">Top</option><option value="new">New</option>
+      <option value="controversial">Controversial</option><option value="old">Old</option><option value="qa">Q&amp;A</option>
+    </select>
+  </label>
+  <label class="row">Text size <span><input type="range" min="12" max="20" data-key="viewerFontSize"><output></output>px</span></label>
+  <label class="check"><input type="checkbox" data-key="historyBack"> Browser Back button closes the viewer</label>
+  <label class="check"><input type="checkbox" data-key="collapseAutoMod"> Collapse AutoModerator comments</label>
+  <p class="hint">Keys while open: <kbd>J</kbd>/<kbd>K</kbd> next/prev post · <kbd>Esc</kbd> close · <kbd>Backspace</kbd> back.<br>Ctrl/⌘/middle-click still opens a new tab.</p>
+</section>
+
+<section data-panel="media">
+  <label class="check"><input type="checkbox" data-key="lightbox"> Replace Reddit's image viewer</label>
+  <label class="row">Style
+    <select data-key="lightboxStyle">
+      <option value="step">One at a time — wheel = next/prev</option>
+      <option value="strip">Vertical strip — wheel scrolls</option>
+    </select>
+  </label>
+  <label class="row">When the gallery ends
+    <select data-key="lightboxScope">
+      <option value="feed">Keep going into the next posts</option>
+      <option value="post">Stop at the end of this post</option>
+    </select>
+  </label>
+  <label class="row">Posts to step through
+    <select data-key="lightboxPosts">
+      <option value="all">All posts (text posts as cards)</option>
+      <option value="media">Images and videos</option>
+      <option value="images">Images only</option>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" data-key="lightboxText"> Show post text beside the media</label>
+  <label class="check"><input type="checkbox" data-key="lightboxComments"> Show comments in that panel</label>
+  <label class="check"><input type="checkbox" data-key="lightboxFilmstrip"> Show thumbnail strip</label>
+  <p class="hint">Click outside the image or press <kbd>Esc</kbd> to close · click image to zoom, drag to pan · <kbd>Ctrl</kbd>+wheel zoom · <kbd>C</kbd> opens comments · <kbd>T</kbd> shows/hides post text.</p>
+</section>
+
+<section data-panel="video">
+  <label class="row">Autoplay
+    <select data-key="videoMode">
+      <option value="volume">Autoplay with sound at…</option>
+      <option value="muted">Autoplay muted</option>
+      <option value="off">Don't autoplay</option>
+      <option value="default">Reddit default</option>
+    </select>
+  </label>
+  <label class="row">Volume <span><input type="range" min="0" max="100" step="5" data-key="videoVolume"><output></output>%</span></label>
+  <label class="check"><input type="checkbox" data-key="videoPauseOffscreen"> Pause videos scrolled out of view</label>
+  <label class="check"><input type="checkbox" data-key="videoLoop"> Loop videos in the viewer</label>
+  <p class="hint">Browsers block sound until you've clicked the page once; until then videos start muted and unmute on your first click. <kbd>Alt</kbd>+<kbd>V</kbd> cycles modes.</p>
+</section>
+
+<section data-panel="filters">
+  <h2>NSFW</h2>
+  <div class="seg" data-key="nsfwMode">
+    <button value="reddit">Reddit default</button><button value="show">Show</button><button value="blur">Blur</button><button value="hide">Hide</button>
+  </div>
+  <p class="hint"><kbd>Alt</kbd>+<kbd>N</kbd> cycles from any Reddit page.</p>
+  <h2>Spoilers</h2>
+  <label class="check"><input type="checkbox" data-key="revealSpoilers"> Auto-reveal all spoilers</label>
+  <button id="revealNow" class="btn">Reveal everything on this page now</button>
+  <p class="hint"><kbd>Alt</kbd>+<kbd>S</kbd> toggles auto-reveal.</p>
+  <h2>Other</h2>
+  <label class="check"><input type="checkbox" data-key="presets.hidePromoted"> Hide promoted posts / ads</label>
+  <label class="check"><input type="checkbox" data-key="presets.hideSuggestions"> Hide "recommended" &amp; recent-posts widgets</label>
+  <label class="check"><input type="checkbox" data-key="showAvatars"> Show user pictures and subreddit icons</label>
+  <label class="check"><input type="checkbox" data-key="navGear"> Show settings gear in Reddit's top bar</label>
+  <label class="check"><input type="checkbox" data-key="quickBar"> Show quick bar on pages (bottom-left)</label>
+</section>
+
+<section data-panel="look">
+  <h2>Theme</h2>
+  <div id="themes" class="themes"></div>
+  <label class="row">Accent color <span><input type="color" id="accentPick"><button id="accentReset" class="link">reset</button></span></label>
+  <h2>Layout presets</h2>
+  <label class="check"><input type="checkbox" data-key="presets.cards"> Card-style posts</label>
+  <label class="check"><input type="checkbox" data-key="presets.compact"> Compact feed (hide text previews)</label>
+  <label class="check"><input type="checkbox" data-key="presets.wideFeed"> Wide feed</label>
+  <label class="check"><input type="checkbox" data-key="presets.hideLeft"> Hide left navigation</label>
+  <label class="check"><input type="checkbox" data-key="presets.hideRight"> Hide right sidebar</label>
+  <label class="check"><input type="checkbox" data-key="presets.hideAwards"> Hide award &amp; share buttons</label>
+  <label class="check"><input type="checkbox" data-key="presets.squareCorners"> Square corners</label>
+  <label class="row">Max media height in feed <span><input type="number" min="0" max="2000" step="50" data-key="presets.maxMediaHeight" class="num">px</span></label>
+  <h2>Custom CSS</h2>
+  <textarea id="customCss" spellcheck="false" placeholder="/* your CSS, applied to every Reddit page */"></textarea>
+  <div class="split"><button id="exportBtn" class="link">Export settings</button><button id="importBtn" class="link">Import settings</button><button id="resetBtn" class="link danger">Reset all</button></div>
+</section>
+
+<section data-panel="accounts">
+  <p id="acctStatus" class="hint">Open a Reddit tab to manage accounts.</p>
+  <div id="acctList"></div>
+  <button id="acctSave" class="btn" hidden>Save current account</button>
+  <button id="acctAdd" class="btn ghost">Log in another account</button>
+  <p class="hint">How it works: log in normally, then save. Switching swaps Reddit's login cookies — no passwords are stored. Saved sessions stay on this computer; logging out on Reddit ends that saved session. <kbd>Alt</kbd>+<kbd>A</kbd> opens the switcher on the page.</p>
+</section>
+</main>
+<script src="../content/defaults.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
