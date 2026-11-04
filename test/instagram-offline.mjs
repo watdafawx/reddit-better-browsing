@@ -244,7 +244,7 @@ let name = (await dl.catch(() => null))?.suggestedFilename();
 check('download current slide, named from pattern', name === 'alice_PHOTOAAAAAA_2.jpg', name);
 const names = [];
 page.on('download', d => names.push(d.suggestedFilename()));
-await page.locator('.igb-tools .igb-tool', { hasText: 'All' }).click();
+await page.locator('.igb-tools .igb-dl-all').click();
 await page.waitForTimeout(1500);
 check('download all slides', names.join() === 'alice_PHOTOAAAAAA_1.jpg,alice_PHOTOAAAAAA_2.jpg,alice_PHOTOAAAAAA_3.jpg', names);
 await page.locator('#single img').scrollIntoViewIfNeeded();
@@ -277,7 +277,7 @@ check('buttons stay up beside the post in view, mouse elsewhere', stay.shown && 
 await page.locator('.igb-tools .igb-embed-btn').click().catch(() => {});
 await page.waitForTimeout(400);
 const copied = await page.evaluate(async () => ({ toast: document.querySelector('.igb-toast')?.textContent, clip: await navigator.clipboard.readText().catch(e => 'ERR ' + e.message) }));
-check('🔗 copies Discord embed link (reel path for a video)', copied.clip === 'https://kkinstagram.com/reel/VIDEOBBBBBB/' && /Copied https:\/\/kkinstagram\.com\/reel\/VIDEOBBBBBB\//.test(copied.toast || ''), copied);
+check('link button copies Discord embed link (reel path for a video)', copied.clip === 'https://kkinstagram.com/reel/VIDEOBBBBBB/' && /Copied https:\/\/kkinstagram\.com\/reel\/VIDEOBBBBBB\//.test(copied.toast || ''), copied);
 
 // ---------- not interested ----------
 await page.goto('https://www.instagram.com/');
@@ -334,17 +334,30 @@ check('caption addresses become links (not e-mail)', cap.links.join() === 'https
 check('caption over the video stays visible and clickable', /igb-cap/.test(cap.cls) && !/igb-ov/.test(cap.cls) && cap.opacity === '1' && cap.userHit, cap);
 
 // auto-scroll button switches the setting
-const asText = () => page.evaluate(() => { const b = document.querySelector('.igb-as'); return b && !b.hidden ? b.textContent : null; });
-const as0 = await asText();
-await page.click('.igb-as').catch(() => {});
+// in the button column beside the reel
+const asState = () => page.evaluate(() => { const b = document.querySelector('.igb-tools:not([hidden]) .igb-as-btn'); return b ? b.getAttribute('aria-pressed') + ' ' + b.textContent : null; });
+const as0 = await asState();
+await page.click('.igb-tools .igb-as-btn').catch(() => {});
 await page.waitForTimeout(500);
-const as1 = await asText();
+const as1 = await asState();
 const loop1 = await page.evaluate(() => document.getElementById('r3').loop);
-await page.click('.igb-as').catch(() => {});
+await page.click('.igb-tools .igb-as-btn').catch(() => {});
 await page.waitForTimeout(500);
-const as2 = await asText();
-check('reels auto-scroll button toggles it', as0 === 'Auto-scroll: On' && as1 === 'Auto-scroll: Off' && loop1 === true && as2 === 'Auto-scroll: On', { as0, as1, loop1, as2 });
-const asOff = await page.evaluate(() => { history.pushState({}, '', '/'); document.body.append(document.createElement('div')); return new Promise(r => setTimeout(() => r(document.querySelector('.igb-as')?.hidden), 700)); });
+const as2 = await asState();
+check('auto-scroll button in the column toggles it', as0 === 'true Auto' && as1 === 'false Off' && loop1 === true && as2 === 'true Auto', { as0, as1, loop1, as2 });
+const look = await page.evaluate(() => { const b = document.querySelector('.igb-tools .igb-dl'), cs = getComputedStyle(b);
+  return { bg: cs.backgroundColor, svg: !!b.querySelector('svg[stroke="currentColor"]'), w: Math.round(b.getBoundingClientRect().width) }; });
+check('buttons look like Instagram action buttons (bare line icons)', look.bg === 'rgba(0, 0, 0, 0)' && look.svg && look.w === 40, look);
+
+// a reel that comes up muted after the page has had a click gets the user's level back
+const unmuted = await page.evaluate(() => new Promise(r => {
+  document.getElementById('col').insertAdjacentHTML('beforeend', '<video id="rm" muted src="https://cdn.example.test/m.mp4" style="width:300px;height:300px"></video>');
+  const v = document.getElementById('rm');
+  Object.defineProperty(v, 'paused', { get: () => false });
+  setTimeout(() => r({ muted: v.muted, volume: v.volume, active: navigator.userActivation.hasBeenActive }), 1000);
+}));
+check('reel stuck muted after a click gets unmuted', unmuted.active && unmuted.muted === false && Math.abs(unmuted.volume - 0.4) < 0.01, unmuted);
+const asOff = await page.evaluate(() => { history.pushState({}, '', '/'); document.body.append(document.createElement('div')); return new Promise(r => setTimeout(() => r(!document.querySelector('.igb-tools:not([hidden]) .igb-as-btn')), 700)); });
 check('auto-scroll button only on the Reels tab', asOff === true, asOff);
 
 // ---------- settings panel: sidebar gear, Alt+W ----------

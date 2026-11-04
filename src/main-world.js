@@ -11,8 +11,22 @@
   const setMuted = (el, v) => mutedDesc.set.call(el, v);
   const setVol = (el, v) => volDesc.set.call(el, v);
 
-  let lastGesture = 0;
+  let lastGesture = 0, lastPath = new Set();
   const gesture = () => Date.now() - lastGesture < 1200 || !!(navigator.userActivation && navigator.userActivation.isActive && Date.now() - lastGesture < 5000);
+  // A recent click/key on THIS video's own player (the video, its controls, Reddit's buttons around it,
+  // across shadow DOM). A click elsewhere (opening a post, scrolling to the next video) doesn't make
+  // Reddit's mute of a new player the user's choice.
+  const userOn = el => {
+    if (!gesture()) return false;
+    let p = el;
+    for (let i = 0; i < 7 && p; i++) {
+      if (lastPath.has(p)) return true;
+      p = p.parentNode instanceof ShadowRoot ? p.parentNode.host : p.parentElement;
+      if (!p || p === document.body || p === document.documentElement) break;
+    }
+    return false;
+  };
+  const activated = () => !!navigator.userActivation?.hasBeenActive;
   // Parse the settings attribute only when it changes (the setters below run on every volume/mute write)
   let cfgCache = {};
   const readCfg = () => { try { cfgCache = JSON.parse(document.documentElement.dataset.rbeVideo || '{}'); } catch { cfgCache = {}; } };
@@ -23,8 +37,9 @@
 
   // Videos that had to start muted because the browser blocked audible autoplay; unmute on first interaction.
   const waitingForGesture = new Set();
-  const onGesture = () => {
+  const onGesture = e => {
     lastGesture = Date.now();
+    lastPath = new Set(e.composedPath ? e.composedPath() : [e.target]);
     const c = cfg();
     if (c.mode !== 'volume' || !c.volume) return;
     for (const v of waitingForGesture) {
@@ -44,8 +59,10 @@
     }
   }
 
+  const played = new Set();   // for the safety net below (media events don't leave shadow roots)
   P.play = function () {
     if (!active(this)) return origPlay.apply(this, arguments);
+    played.add(this);
     const c = cfg();
     const user = gesture();
     if (c.mode === 'off' && !user && !this.dataset.rbeAllowed) {
@@ -70,7 +87,7 @@
     get() { return mutedDesc.get.call(this); },
     set(v) {
       if (active(this) && !this.dataset.rbeUserAudio) {
-        if (gesture()) { this.dataset.rbeUserAudio = '1'; waitingForGesture.delete(this); }
+        if (userOn(this)) { this.dataset.rbeUserAudio = '1'; waitingForGesture.delete(this); }
         else return;                            // ignore page-initiated (un)mute
       }
       setMuted(this, v);
@@ -81,12 +98,46 @@
     get() { return volDesc.get.call(this); },
     set(v) {
       if (active(this) && !this.dataset.rbeUserAudio) {
-        if (gesture()) this.dataset.rbeUserAudio = '1';
+        if (userOn(this)) this.dataset.rbeUserAudio = '1';
         else return;
       }
       setVol(this, v);
     }
   });
+
+  // Re-apply our level when playback starts (players set `muted` on mount, before play()).
+  // A video still waiting for a click is fine to unmute once the page has had one.
+  document.addEventListener('playing', e => {
+    const v = e.target;
+    if (!active(v)) return;
+    if (waitingForGesture.has(v) && activated()) waitingForGesture.delete(v);
+    if (!waitingForGesture.has(v)) applyAudio(v, cfg());
+  }, true);
+  // The browser's own controls change volume/mute without the setters above: a change on this
+  // player that differs from our level is the user's, and sticks.
+  document.addEventListener('volumechange', e => {
+    const v = e.target, c = cfg();
+    if (!active(v) || v.dataset.rbeUserAudio || !userOn(v)) return;
+    const want = c.mode === 'muted' ? null : Math.max(0, Math.min(1, (c.volume || 0) / 100));
+    const ours = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
+    if (!ours) { v.dataset.rbeUserAudio = '1'; waitingForGesture.delete(v); }
+  }, true);
+
+  // Safety net: a playing video that is muted though the user never muted it gets our level back.
+  // Only after the page has had a click or key press: unmuting before that makes the browser pause it.
+  // Videos inside shadow roots don't show up in querySelectorAll, so track what has played.
+  document.addEventListener('play', e => { if (active(e.target)) played.add(e.target); }, true);
+  setInterval(() => {
+    const c = cfg();
+    if (c.mode !== 'volume' || !c.volume || document.hidden || !activated()) return;
+    for (const v of played) {
+      if (!v.isConnected) { played.delete(v); continue; }
+      if (v.paused || !v.muted || v.dataset.rbeUserAudio || !active(v)) continue;
+      waitingForGesture.delete(v);
+      setVol(v, c.volume / 100);
+      setMuted(v, false);
+    }
+  }, 600);
 
   // Native autoplay attribute bypasses play(); neuter it when autoplay is off.
   const autoDesc = Object.getOwnPropertyDescriptor(P, 'autoplay');

@@ -135,29 +135,19 @@
     IGB.nextReel(v);
   }, true);
 
-  // On/off button for auto-scroll, bottom right of the Reels tab
-  let asBtn = null;
-  function syncButton() {
-    if (!document.body) return;
-    if (!onReels() || document.documentElement.hasAttribute('data-igb-lb')) { if (asBtn) asBtn.hidden = true; return; }
-    if (!asBtn) {
-      asBtn = IGB.h('button', { class: 'igb-root igb-as', type: 'button',
-        onclick: () => IGB.saveSetting('reelsAutoScroll', !IGB.settings.reelsAutoScroll) });
-      document.body.append(asBtn);
-    }
+  // On/off switch for auto-scroll, in the button column beside the reel (downloads.js builds it;
+  // the column is rebuilt on every settings change, so the state shown is always current)
+  IGB.autoScrollButton = () => {
     const on = !!IGB.settings.reelsAutoScroll;
-    asBtn.hidden = false;
-    asBtn.classList.toggle('on', on);
-    asBtn.setAttribute('aria-pressed', String(on));
-    asBtn.title = on ? 'Auto-scroll on: the next reel starts when this one ends' : 'Auto-scroll off: reels loop';
-    asBtn.textContent = on ? 'Auto-scroll: On' : 'Auto-scroll: Off';
-  }
+    return IGB.h('button', {
+      class: 'igb-tool igb-as-btn' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on),
+      'aria-label': 'Auto-scroll', title: on ? 'Auto-scroll on: the next reel starts when this one ends (click to turn off)' : 'Auto-scroll off: reels loop (click to turn on)',
+      onclick: e => { e.preventDefault(); e.stopPropagation(); IGB.saveSetting('reelsAutoScroll', !on); }
+    }, IGB.icon('autoScroll'), IGB.h('span', { class: 'igb-tool-label' }, on ? 'Auto' : 'Off'));
+  };
   IGB.onSettings(() => {
-    syncButton();
     if (autoScroll()) visible.forEach(v => { if (!ours(v) && !isTile(v)) v.loop = false; });
   });
-  IGB.onDomChange(syncButton, 400);
-  addEventListener('popstate', () => setTimeout(syncButton, 50));
 
   // For videos we create ourselves (lightbox)
   IGB.setupOwnVideo = function (v) {

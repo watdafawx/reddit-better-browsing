@@ -123,6 +123,30 @@ await page.waitForSelector('.rbe-viewer video', { timeout: 10000 });
 await page.waitForTimeout(2500);
 r.video = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'); return { src: (el.currentSrc || el.getAttribute('src') || '').slice(0, 30), vol: el.volume, muted: el.muted }; });
 await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+
+// Reddit's own players (shadow DOM): a mute right after a click elsewhere is Reddit's, not the user's;
+// one right after a click on that player's own button is the user's and sticks
+r.audio = await page.evaluate(() => {
+  const host = document.createElement('div'); document.body.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  root.innerHTML = '<video style="width:300px;height:200px"></video><button id="mb">mute</button>';
+  const v = root.querySelector('video');
+  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+  v.muted = true;
+  const afterElsewhere = v.muted;
+  root.getElementById('mb').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+  v.muted = true;
+  return { afterElsewhere, afterOwn: v.muted, user: v.dataset.rbeUserAudio || null };
+});
+// a playing video that ended up muted (user never muted it) gets the volume back after a click
+r.safety = await page.evaluate(() => new Promise(res => {
+  document.body.insertAdjacentHTML('beforeend', '<video id="stuck" muted style="width:300px;height:200px"></video>');
+  const v = document.getElementById('stuck');
+  Object.defineProperty(v, 'paused', { get: () => false });
+  v.dispatchEvent(new Event('play'));
+  setTimeout(() => res({ muted: v.muted, vol: v.volume, active: navigator.userActivation.hasBeenActive }), 1000);
+}));
 
 // settings change through storage reaches the page (filtered onChanged)
 await sw.evaluate(() => chrome.storage.sync.get('settings').then(({ settings = {} }) => chrome.storage.sync.set({ settings: { ...settings, theme: 'nord' } })));
@@ -156,6 +180,9 @@ const checks = {
   'Esc closes viewer': r.closed,
   'reopen uses cache': r.reopenReqs === 0,
   'video gets volume setting': r.video.vol === 0.1,
+  'page mute after a click elsewhere ignored': r.audio.afterElsewhere === false,
+  'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
+  'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,
   'no page errors or dialogs': !logs.some(l => /pageerror|DIALOG/.test(l)),
 };

@@ -40,7 +40,7 @@
 
   // getCode() / getArt() are read at click time
   IGB.notInterestedButton = (getCode, getArt) => h('button', {
-    class: 'igb-tool igb-ni-btn', title: 'Not interested (see fewer posts like this)',
+    class: 'igb-tool igb-ni-btn', type: 'button', title: 'Not interested (see fewer posts like this)', 'aria-label': 'Not interested',
     onclick: async e => {
       e.preventDefault(); e.stopPropagation();
       const b = e.currentTarget;
@@ -51,5 +51,5 @@
       catch (err) { console.warn('[IGB] not interested failed', err); IGB.toast('Could not mark as not interested (' + err.message + ').'); }
       finally { b.classList.remove('busy'); }
     }
-  }, '⊘');
+  }, IGB.icon('notInterested'));
 })();
