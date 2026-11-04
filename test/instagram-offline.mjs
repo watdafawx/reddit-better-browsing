@@ -75,7 +75,7 @@ const explore = `<!doctype html><html><head><title>explore</title>${igScript}</h
 const reel = n => `<div style="height:860px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center">
   <div style="position:relative;width:420px;height:746px"><video id="r${n}" src="https://cdn.example.test/reel${n}.mp4" playsinline style="width:100%;height:100%;display:block;background:#222"></video>
     <div class="ovl" role="button" tabindex="0" style="position:absolute;inset:0">
-      <div role="button" aria-label="Audio is muted" class="mute" style="position:absolute;right:10px;bottom:60px;width:28px;height:28px;background:#555"><svg width="12" height="12"><path d="M0 0h12v12z"/></svg></div>
+      <div role="button" class="mute" style="position:absolute;right:4px;bottom:4px;width:28px;height:28px;background:#555"><svg width="12" height="12" aria-label="Audio is muted"><title>Audio is muted</title><path d="M0 0h12v12z"/></svg></div>
       <div id="cap${n}" style="position:absolute;left:0;right:0;bottom:0;height:0"><div style="position:absolute;left:10px;bottom:20px;width:280px;padding:10px;color:#fff;font:14px/18px sans-serif">
         <a href="/user${n}/" style="color:#fff">user${n}</a>
         <div role="button" tabindex="0" class="capbtn" style="display:flex"><span style="white-space:nowrap;overflow:hidden;text-overflow:clip;width:200px">Line one of a long caption that is cut off here</span><span aria-hidden="true">… more</span></div>
@@ -86,8 +86,13 @@ const capScript = `<script>document.addEventListener('click', e => { const b = e
   const full = document.createElement('div'); full.className = 'capfull';
   full.innerHTML = '<span style="white-space:pre-line">Line one of a long caption that is cut off here\\nLinks: linktr.ee/foo, https://example.com/a?b=1. Mail me@mail.com <a href="/explore/tags/tag/">#tag</a></span>';
   b.replaceWith(full); });</script>`;
+// Logged-in layout: the caption sits beside the video, cut by line-clamp inside a role=button
+const sideCap = `<div id="side" style="position:fixed;left:20px;bottom:20px;width:220px;max-height:110px;overflow:hidden;color:#fff;font:14px/18px sans-serif"><div role="presentation">
+  <div role="button" tabindex="0" class="clampbtn"><div dir="auto" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${'A long caption beside the reel. '.repeat(8)}</div></div></div></div>
+<script>document.addEventListener('click', e => { const b = e.target.closest('.clampbtn'); if (!b) return;
+  const t = b.querySelector('[dir=auto]'); t.style.webkitLineClamp = 'none'; t.style.display = 'block'; document.getElementById('side').style.maxHeight = '475px'; });</script>`;
 const reels = `<!doctype html><html><head><title>reels</title>${igScript}${capScript}</head><body style="margin:0;background:#000">
-<main><div id="col" style="height:900px;overflow-y:auto;scroll-snap-type:y mandatory">${[1, 2, 3].map(reel).join('')}</div></main></body></html>`;
+<main>${sideCap}<div id="col" style="height:900px;overflow-y:auto;scroll-snap-type:y mandatory">${[1, 2, 3].map(reel).join('')}</div></main></body></html>`;
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 const reqs = [];
@@ -338,7 +343,9 @@ const cap = await page.evaluate(() => {
 check('reels caption opened in full', cap.full && !cap.btn, cap);
 check('caption addresses become links (not e-mail)', cap.links.join() === 'https://linktr.ee/foo,https://example.com/a?b=1' && /Mail me@mail\.com/.test(cap.text || ''), cap);
 check('caption over the video stays visible and clickable', cap.cls === 'igb-cap' && !cap.hiddenAncestor && cap.opacity === '1' && cap.userHit, cap);
-check('reels: tap layer click-through, mute icon hidden, controls on', cap.centerIsVideo && cap.muteHidden && cap.controls, cap);
+check('reels: tap layer click-through, mute icon (corner, SVG title) hidden, controls on', cap.centerIsVideo && cap.muteHidden && cap.controls, cap);
+const sideCapState = await page.evaluate(() => { const t = document.querySelector('#side [dir=auto]'); return { h: t.clientHeight, sh: t.scrollHeight, clamp: getComputedStyle(t).webkitLineClamp }; });
+check('reels: caption beside the video (line-clamp) opened in full', sideCapState.clamp === 'none' && sideCapState.h > 54 && sideCapState.h >= sideCapState.sh - 2, sideCapState);
 
 // auto-scroll button switches the setting
 // in the button column beside the reel
