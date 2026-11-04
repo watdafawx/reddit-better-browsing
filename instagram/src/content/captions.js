@@ -90,6 +90,7 @@
   // block cut by CSS line-clamp; clicking it opens the caption in place as well.
   const clamped = el => { const cs = getComputedStyle(el); return cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2; };
   const clicked = new WeakSet();
+  let lastTry = 0, tries = [], opened = false;
   // The open caption is still Instagram's button: a click anywhere on it would fold it up again.
   // Stop those clicks at the caption (before Instagram's handler at the page root) so it reads as
   // plain text; links in it (hashtags, @users, addresses) still work, and text can be selected.
@@ -103,11 +104,19 @@
   }
   function expand() {
     if (!/^\/reels?\//.test(location.pathname)) return;
-    for (const txt of document.querySelectorAll('main [role="button"] [dir="auto"]')) {
-      const btn = txt.closest('[role="button"]');
-      if (btn.dataset.igbCaption || btn.querySelector('svg, img, video')) continue;
-      if (clamped(txt)) { if (!clicked.has(btn)) { clicked.add(btn); btn.click(); } }
-      else if (clicked.has(btn)) lockOpen(btn);   // opened by us: keep it that way
+    // Instagram keeps ONE open/folded state for all Reels captions on the page and re-renders every
+    // caption when it changes. So: click one cut-off caption (that opens them all), wait for the
+    // re-render, and give up after a few tries rather than loop. Once none is cut off, lock them all.
+    const caps = [...document.querySelectorAll('main [role="button"] [dir="auto"]')].map(t => t.closest('[role="button"]'))
+      .filter((b, i, a) => a.indexOf(b) === i && !b.querySelector('svg, img, video'));
+    const cut = caps.find(b => !b.dataset.igbCaption && [...b.querySelectorAll('[dir="auto"]')].some(clamped));
+    const now = Date.now();
+    tries = tries.filter(t => now - t < 20000);
+    if (cut) {
+      if (now - lastTry > 1500 && tries.length < 3) { lastTry = now; tries.push(now); cut.click(); }
+    } else if (tries.length || opened) {   // we opened them: keep them (and new ones) open
+      opened = true;
+      caps.forEach(b => b.dataset.igbCaption || lockOpen(b));
     }
     for (const more of document.querySelectorAll('main [role="button"] span[aria-hidden="true"]')) {
       const btn = more.closest('[role="button"]');
