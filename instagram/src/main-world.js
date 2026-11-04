@@ -84,9 +84,13 @@
 
   // Instagram mutes every new video and keeps its own mute state. Page-initiated changes are
   // ignored; ones from a click/key on that video's player are the user's and stick.
+  // With browser controls on (not on stories), Instagram's own mute/volume buttons are hidden, so a
+  // write from the page is never the user's: Instagram mutes a reel when you click it to resume, and
+  // that used to stick. The user's changes come from the browser controls (volumechange below).
+  const nativeOn = () => root.classList.contains('igb-native') && !location.pathname.startsWith('/stories/');
   const userWrite = el => {
     if (!active(el)) return true;
-    if (!userOn(el)) return false;
+    if (nativeOn() || !userOn(el)) return false;
     el.dataset.igbUserAudio = '1';
     waiting.delete(el);
     return true;

@@ -87,12 +87,23 @@ const capScript = `<script>document.addEventListener('click', e => { const b = e
   full.innerHTML = '<span style="white-space:pre-line">Line one of a long caption that is cut off here\\nLinks: linktr.ee/foo, https://example.com/a?b=1. Mail me@mail.com <a href="/explore/tags/tag/">#tag</a></span>';
   b.replaceWith(full); });</script>`;
 // Logged-in layout: the caption sits beside the video, cut by line-clamp inside a role=button
-const sideCap = `<div id="side" style="position:fixed;left:20px;bottom:20px;width:220px;max-height:110px;overflow:hidden;color:#fff;font:14px/18px sans-serif"><div role="presentation">
-  <div role="button" tabindex="0" class="clampbtn"><div dir="auto" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${'A long caption beside the reel. '.repeat(8)}<a href="/explore/tags/cozy/">#cozy</a></div></div></div></div>
-<script>document.addEventListener('click', e => { if (e.target.closest('.clampbtn a')) { window.__tagClicks = (window.__tagClicks || 0) + 1; e.preventDefault(); }
-  const b = e.target.closest('.clampbtn'); if (!b) return;
-  const t = b.querySelector('[dir=auto]'), open = t.style.webkitLineClamp === 'none';   /* Instagram toggles open / folded */
-  t.style.webkitLineClamp = open ? '3' : 'none'; t.style.display = open ? '-webkit-box' : 'block'; document.getElementById('side').style.maxHeight = open ? '110px' : '475px'; });</script>`;
+// Logged-in layout: captions beside the video, cut by line-clamp inside a role=button. Like Instagram,
+// there's ONE open/folded state for all captions, and every toggle re-renders them as new elements.
+const sideCap = `<div id="side" style="position:fixed;left:20px;bottom:20px;width:220px;color:#fff;font:14px/18px sans-serif"></div>
+<script>
+  window.__capOpen = false; window.__toggles = 0;
+  function renderCaps() {
+    document.getElementById('side').innerHTML = [1, 2, 3].map(n => '<div style="max-height:' + (__capOpen ? 475 : 110) + 'px;overflow:hidden"><div role="presentation"><div role="button" tabindex="0" class="clampbtn"><div dir="auto" style="'
+      + (__capOpen ? 'display:block' : 'display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden') + '">Caption ' + n + ': ' + 'A long caption beside the reel. '.repeat(8)
+      + '<a href="/explore/tags/cozy/">#cozy</a></div></div></div></div>').join('');
+  }
+  addEventListener('DOMContentLoaded', renderCaps);
+  document.addEventListener('click', e => {
+    if (e.target.closest('.clampbtn a')) { window.__tagClicks = (window.__tagClicks || 0) + 1; e.preventDefault(); }
+    if (!e.target.closest('.clampbtn')) return;
+    __capOpen = !__capOpen; __toggles++; setTimeout(renderCaps, 10);
+  });
+</script>`;
 const reels = `<!doctype html><html><head><title>reels</title>${igScript}${capScript}</head><body style="margin:0;background:#000">
 <main>${sideCap}<div id="col" style="height:900px;overflow-y:auto;scroll-snap-type:y mandatory">${[1, 2, 3].map(reel).join('')}</div></main></body></html>`;
 
@@ -160,14 +171,19 @@ await page.waitForTimeout(300);
 const afterVidClick = await page.evaluate(() => ({ nav: window.__igNav, url: location.pathname, lb: !!document.querySelector('.igb-lb') }));
 check('video click stays on page', afterVidClick.nav === 0 && afterVidClick.url === '/' && !afterVidClick.lb, afterVidClick);
 
-// user changes volume on the player: sticks, and Instagram's next mute still blocked
+// Instagram mutes a video when you click it (to pause / resume): with browser controls on that's never the user's
 await page.mouse.move(vb.x + vb.width / 2, vb.y + vb.height / 2);
 await page.mouse.down(); await page.mouse.up();
-await page.evaluate(() => { const v = document.querySelector('#vid video'); v.volume = 0.9; });
-await page.evaluate(() => new Promise(r => setTimeout(r, 1500)));
+const clickMute = await page.evaluate(() => { const v = document.querySelector('#vid video'); v.muted = true; return { muted: v.muted, user: v.dataset.igbUserAudio || null }; });
+check('page mute right after a click on the video ignored (browser controls on)', clickMute.muted === false && !clickMute.user, clickMute);
+// the user changes volume with the browser controls (no page setter: done through another frame's setter)
+await page.mouse.down(); await page.mouse.up();
+await page.evaluate(() => { const v = document.querySelector('#vid video'), f = document.createElement('iframe'); document.body.append(f);
+  Object.getOwnPropertyDescriptor(f.contentWindow.HTMLMediaElement.prototype, 'volume').set.call(v, 0.9); f.remove(); });
+await page.evaluate(() => new Promise(r => setTimeout(r, 300)));
 await page.evaluate(() => { const v = document.querySelector('#vid video'); v.muted = true; });
-const userVol = await page.evaluate(() => { const v = document.querySelector('#vid video'); return { volume: v.volume, muted: v.muted }; });
-check('user volume kept, later page mute ignored', Math.abs(userVol.volume - 0.9) < 0.01 && userVol.muted === false, userVol);
+const userVol = await page.evaluate(() => { const v = document.querySelector('#vid video'); return { volume: v.volume, muted: v.muted, user: v.dataset.igbUserAudio || null }; });
+check('user volume from browser controls kept, page mute still ignored', Math.abs(userVol.volume - 0.9) < 0.01 && userVol.muted === false && userVol.user === '1', userVol);
 
 // ---------- feed photo → lightbox at the active carousel slide ----------
 const pb = await page.locator('#photo img').boundingBox();
@@ -348,14 +364,17 @@ check('caption over the video stays visible and clickable', cap.cls === 'igb-cap
 check('reels: tap layer click-through, mute icon (corner, SVG title) hidden, controls on', cap.centerIsVideo && cap.muteHidden && cap.controls, cap);
 const sideCapState = await page.evaluate(() => { const t = document.querySelector('#side [dir=auto]'); return { h: t.clientHeight, sh: t.scrollHeight, clamp: getComputedStyle(t).webkitLineClamp }; });
 // clicks on the open caption don't fold it; its links still reach the page
-const sideBox = await page.locator('#side [dir=auto]').boundingBox();
+const sideBox = await page.locator('#side [dir=auto]').first().boundingBox();
 await page.mouse.click(sideBox.x + 30, sideBox.y + 8);
 await page.waitForTimeout(300);
 const afterText = await page.evaluate(() => getComputedStyle(document.querySelector('#side [dir=auto]')).webkitLineClamp);
-await page.locator('#side a').click().catch(() => {});
+const capsState = await page.evaluate(() => ({ toggles: window.__toggles, open: [...document.querySelectorAll('#side [dir=auto]')].map(t => getComputedStyle(t).webkitLineClamp) }));
+const markedBefore = await page.evaluate(() => document.querySelectorAll('#side [data-igb-caption]').length);
+await page.locator('#side a').first().click().catch(() => {});
 await page.waitForTimeout(300);
-const locked = await page.evaluate(() => ({ tag: window.__tagClicks || 0, marked: !!document.querySelector('#side [data-igb-caption]') }));
-check('reels: open caption stays open on click, Instagram links still reach the page', afterText === 'none' && locked.tag === 1 && locked.marked, { afterText, ...locked });
+const locked = await page.evaluate(() => ({ tag: window.__tagClicks || 0 }));
+check('reels: open caption stays open on click, Instagram links still reach the page', afterText === 'none' && locked.tag === 1 && markedBefore === 3, { afterText, markedBefore, ...locked });
+check('reels: shared caption state opened with one click, no open/fold loop', capsState.toggles === 1 && capsState.open.every(c => c === 'none'), capsState);
 check('reels: caption beside the video (line-clamp) opened in full', sideCapState.clamp === 'none' && sideCapState.h > 54 && sideCapState.h >= sideCapState.sh - 2, sideCapState);
 
 // auto-scroll button switches the setting
