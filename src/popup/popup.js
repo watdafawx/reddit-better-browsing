@@ -1,9 +1,15 @@
+/* Settings form. The extension popup (and the settings frame on reddit.com) mounts it on its own
+   document; the userscript mounts it inside an in-page panel (opts: toTab, close, noAccounts). */
+RBE.mountSettings = function (root, opts = {}) {
 const api = RBE.api;
 // opened from the gear on reddit.com: fill the frame instead of the fixed popup size
-if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');
+if (root === document && new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');
 let settings;
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
+const $ = s => root.querySelector(s);
+const $$ = s => [...root.querySelectorAll(s)];
+const close = opts.close || (() => window.close());
+// Account switching swaps Reddit's cookies, which only the extension can do
+if (opts.noAccounts) { $('#tabs [data-tab="accounts"]')?.remove(); $('section[data-panel="accounts"]')?.remove(); }
 
 const getPath = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
 const setPath = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
@@ -25,7 +31,7 @@ $$('#tabs button').forEach(b => b.addEventListener('click', () => {
   try { localStorage.rbeTab = b.dataset.tab; } catch {}
   if (b.dataset.tab === 'accounts') loadAccounts();
 }));
-try { const t = localStorage.rbeTab; if (t) document.querySelector(`#tabs [data-tab="${t}"]`)?.click(); } catch {}
+try { const t = localStorage.rbeTab; if (t) $(`#tabs [data-tab="${t}"]`)?.click(); } catch {}
 
 function bind() {
   $$('[data-key]').forEach(el => {
@@ -104,6 +110,7 @@ async function redditTab() {
   return tab && /^https:\/\/([a-z]+\.)?reddit\.com\//.test(tab.url || '') ? tab : (tab && tab.url === undefined ? tab : null);
 }
 async function toTab(msg) {
+  if (opts.toTab) return opts.toTab(msg);
   const tab = await redditTab();
   if (!tab) throw new Error('Open a Reddit tab first');
   const r = await api.tabs.sendMessage(tab.id, msg);
@@ -111,7 +118,7 @@ async function toTab(msg) {
   return r;
 }
 
-$('#revealNow').onclick = () => toTab({ type: 'rbe:revealAll' }).then(() => window.close()).catch(e => alert(e.message));
+$('#revealNow').onclick = () => toTab({ type: 'rbe:revealAll' }).then(() => close()).catch(e => alert(e.message));
 
 // ---------- accounts ----------
 async function loadAccounts() {
@@ -128,7 +135,7 @@ async function loadAccounts() {
     const b = document.createElement('b'); b.textContent = 'u/' + a.name;
     const sw = document.createElement('button'); sw.textContent = a.name === me ? 'Current' : 'Switch';
     sw.disabled = a.name === me;
-    sw.onclick = async () => { sw.textContent = 'Switching…'; try { await toTab({ type: 'rbe:switch', name: a.name }); window.close(); } catch (e) { alert(e.message); sw.textContent = 'Switch'; } };
+    sw.onclick = async () => { sw.textContent = 'Switching…'; try { await toTab({ type: 'rbe:switch', name: a.name }); close(); } catch (e) { alert(e.message); sw.textContent = 'Switch'; } };
     const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Forget';
     x.onclick = async () => { await api.runtime.sendMessage({ type: 'acct:remove', name: a.name }); loadAccounts(); };
     row.append(b, sw, x);
@@ -136,8 +143,8 @@ async function loadAccounts() {
   }));
   $('#acctSave').hidden = !me || accounts.some(a => a.name === me);
 }
-$('#acctSave').onclick = () => toTab({ type: 'rbe:save' }).then(loadAccounts).catch(e => alert(e.message));
-$('#acctAdd').onclick = () => toTab({ type: 'rbe:add' }).then(() => window.close()).catch(e => alert(e.message));
+if (!opts.noAccounts) $('#acctSave').onclick = () => toTab({ type: 'rbe:save' }).then(loadAccounts).catch(e => alert(e.message));
+if (!opts.noAccounts) $('#acctAdd').onclick = () => toTab({ type: 'rbe:add' }).then(() => close()).catch(e => alert(e.message));
 
 // ---------- init ----------
 RBE.loadSettings().then(s => {
@@ -145,5 +152,7 @@ RBE.loadSettings().then(s => {
   $('#customCss').value = s.customCss || '';
   delete settings.customCss;
   bind(); themes();
-  if (document.querySelector('#tabs .on')?.dataset.tab === 'accounts') loadAccounts();
+  if ($('#tabs .on')?.dataset.tab === 'accounts') loadAccounts();
 });
+};
+if (location.protocol.endsWith('extension:')) RBE.mountSettings(document);

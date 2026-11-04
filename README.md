@@ -24,6 +24,17 @@ Download the zip for your browser from the [Releases](../../releases) page, or b
 
 Click the toolbar icon (or the gear the extension adds to Reddit's top bar) to open settings. Settings sync between browsers signed in to the same account.
 
+### Or as one userscript for Reddit and Instagram (auto-updates)
+
+With [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) installed, open
+https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js
+and click **Install**. That one script runs Reddit Better Browsing on reddit.com and [Instagram Better Browsing](instagram/README.md) on instagram.com, and the manager updates it by itself when a new version is released.
+
+- Same features as the extensions, except **account switching** (it swaps Reddit's login cookies, which a userscript can't reach).
+- Settings: the gear in Reddit's top bar (or the quick bar's ⚙️); on Instagram the sidebar gear or <kbd>Alt</kbd>+<kbd>W</kbd>. They're kept in each site's localStorage, so they don't sync between browsers.
+- Use either the script or the extensions for a site, not both: they'd both control the same videos.
+- Chrome needs userscripts allowed: on `chrome://extensions`, open the manager's **Details** and turn on **Allow user scripts** (or Developer mode on older versions).
+
 ## Features
 
 | Feature | What it does |
@@ -108,10 +119,11 @@ See [CLAUDE.md](CLAUDE.md) for how the pieces fit together and the rules to keep
 1. Bump `version` in `manifest.base.json` (and `package.json`).
 2. Run `npm run build` and `npm test`.
 3. Attach `dist/reddit-better-browsing-chrome.zip` and `dist/reddit-better-browsing-firefox.zip` to a GitHub release.
+4. Update the userscript: `npm run release:userscript` (uploads `dist/better-browsing.user.js` to the fixed `userscript` release that installed scripts check). Do this after an Instagram release too.
 
 ## Instagram
 
-`instagram/` holds a second extension for instagram.com: browser video controls on every video, sound on by default at your volume, and a fast lightbox. `npm run build` builds it too (`dist/instagram-chrome`, `dist/instagram-firefox`). See [instagram/README.md](instagram/README.md).
+`instagram/` holds a second extension for instagram.com: browser video controls on every video, sound on by default at your volume, and a fast lightbox. `npm run build` builds it too (`dist/instagram-chrome`, `dist/instagram-firefox`), and the combined userscript `dist/better-browsing.user.js`. See [instagram/README.md](instagram/README.md).
 
 ## License
 

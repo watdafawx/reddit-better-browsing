@@ -398,7 +398,7 @@ try {
 }
 
 // ---------- userscript build, no extension ----------
-const usFile = path.resolve(path.dirname(ext), 'instagram-better-browsing.user.js');
+const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
 if (fs.existsSync(usFile)) {
   const b2 = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const c2 = await b2.newContext({ viewport: { width: 1400, height: 900 } });

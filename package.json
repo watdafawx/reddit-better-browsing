@@ -7,7 +7,8 @@
   "scripts": {
     "build": "node build.js",
     "test": "node test/offline.mjs dist/chrome",
-    "test:instagram": "node test/instagram-offline.mjs dist/instagram-chrome"
+    "test:instagram": "node test/instagram-offline.mjs dist/instagram-chrome",
+    "release:userscript": "gh release upload userscript dist/better-browsing.user.js --clobber"
   },
   "devDependencies": {
     "playwright": "1.49.1"

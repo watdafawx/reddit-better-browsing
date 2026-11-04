@@ -30,6 +30,7 @@
   }
   function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closePanel(); } }
   function openPanel(anchor) {
+    if (RBE.openSettingsInPage) return RBE.openSettingsInPage();   // userscript: no extension page to frame
     if (panel) return closePanel();
     const frame = h('iframe', { class: 'rbe-settings-frame', src: RBE.api.runtime.getURL('popup/popup.html?embed=1'), title: 'Reddit Better Browsing settings' });
     const box = h('div', { class: 'rbe-settings-box' }, frame);
