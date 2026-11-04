@@ -77,10 +77,12 @@
     if (!list.length) return;
     const stage = h('div', { class: 'igb-lb-stage' });
     const dots = h('div', { class: 'igb-lb-dots' });
-    const bar = h('div', { class: 'igb-lb-bar' });
+    // Caption, user and actions live in a panel beside the media (under it on narrow windows)
+    const bar = h('aside', { class: 'igb-lb-bar' });
+    const main = h('div', { class: 'igb-lb-main' }, stage, dots);
     const el = h('div', { class: 'igb-root igb-lb', role: 'dialog', 'aria-modal': 'true', tabindex: '-1' },
       h('button', { class: 'igb-lb-close', title: 'Close (Esc)', onclick: () => close() }, '✕'),
-      stage, dots, bar);
+      main, bar);
     stage.append(
       h('button', { class: 'igb-lb-nav igb-lb-prev', title: 'Previous (←)', onclick: e => { e.stopPropagation(); step(-1); } }, '‹'),
       h('button', { class: 'igb-lb-nav igb-lb-next', title: 'Next (→)', onclick: e => { e.stopPropagation(); step(1); } }, '›'));
@@ -90,7 +92,7 @@
     document.documentElement.setAttribute('data-igb-lb', '');
     document.querySelectorAll('video').forEach(v => { if (!v.paused) v.pause(); });
 
-    el.addEventListener('click', e => { if (e.target === el || e.target === stage || e.target === bar) close(); });
+    el.addEventListener('click', e => { if (e.target === el || e.target === stage || e.target === main) close(); });
     el.addEventListener('wheel', onWheel, { passive: false });
     document.body.append(el);
     el.focus({ preventScroll: true });
@@ -162,15 +164,17 @@
 
   function drawBar(entry, d) {
     const s = IGB.settings;
-    const cap = d && s.lightboxCaption && d.caption ? h('div', { class: 'igb-lb-cap clamp', title: 'Click to expand', onclick: e => e.currentTarget.classList.toggle('clamp') }, d.caption) : h('div', { class: 'igb-lb-cap' });
     lb.bar.replaceChildren(
-      d?.user ? h('a', { class: 'igb-lb-user', href: `/${d.user}/` }, d.user) : '',
-      cap,
+      h('div', { class: 'igb-lb-head' },
+        d?.user ? h('a', { class: 'igb-lb-user', href: `/${d.user}/` }, d.user) : h('span', { class: 'igb-lb-user' }, '…'),
+        d?.taken ? h('span', { class: 'igb-lb-when' }, new Date(d.taken * 1000).toLocaleDateString()) : ''),
+      d && s.lightboxCaption && d.caption ? h('div', { class: 'igb-lb-cap' }, d.caption) : h('div', { class: 'igb-lb-cap' }),
       h('div', { class: 'igb-lb-meta' },
         d?.likes != null ? h('span', null, '♥ ' + d.likes.toLocaleString()) : '',
+        d?.comments != null ? h('span', null, d.comments.toLocaleString() + ' comments') : '',
         h('span', null, `${lb.pi + 1} / ${lb.list.length}`),
-        d && IGB.mediaTools ? IGB.mediaTools(d, () => lb?.ii ?? 0) : '',
-        h('a', { href: `/p/${entry.code}/`, onclick: () => close(true) }, 'Open post')));
+        h('a', { href: `/p/${entry.code}/`, onclick: () => close(true) }, 'Open post')),
+      d && IGB.mediaTools ? h('div', { class: 'igb-lb-actions' }, IGB.mediaTools(d, () => lb?.ii ?? 0)) : '');
   }
 
   // Warm the next posts' data and the next image, so stepping feels instant
