@@ -15,7 +15,7 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
   - <kbd>Esc</kbd>, the browser Back button, or a click beside the media closes it. Ctrl/⌘/middle-click on a grid tile still opens Instagram's own page.
 - Feed photos open in the lightbox on a single click; a double click still likes the post.
 - Stories keep Instagram's own controls (tapping there means next/previous story).
-- **Downloads**: hover a photo, video, reel or story and a small bar appears: **⤓** saves the current slide, **⤓ All** every slide in a carousel, **↗** opens the full-size file in a new tab. The lightbox has the same buttons, plus <kbd>D</kbd>. <kbd>Alt</kbd>+<kbd>S</kbd> saves the current story, lightbox item or whatever is under the mouse. Files come from the API at full quality and are named from a pattern you set (`{user}_{code}_{n}` by default; also `{date}`).
+- **Downloads**: hover a photo, video, reel or story and a column of buttons appears just right of it: **⤓** saves the current slide, **⤓ All** every slide in a carousel, **↗** opens the full-size file in a new tab. The lightbox has the same buttons, plus <kbd>D</kbd>. <kbd>Alt</kbd>+<kbd>S</kbd> saves the current story, lightbox item or whatever is under the mouse. Files come from the API at full quality and are named from a pattern you set (`{user}_{code}_{n}` by default; also `{date}`).
 
 ## Install
 
