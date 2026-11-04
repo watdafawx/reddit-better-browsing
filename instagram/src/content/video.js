@@ -23,7 +23,10 @@
   function markOverlay(v) {
     const vr = v.getBoundingClientRect();
     if (vr.width < 80 || vr.height < 80) return;
-    const pts = [[0.5, 0.5], [0.5, 0.92], [0.92, 0.92], [0.08, 0.92]];
+    // A grid, so buttons in the corners and along the edges are found too (Instagram's mute button
+    // sits in the bottom-right corner, its centre at about 0.96 / 0.98)
+    const pts = [];
+    for (const fy of [0.04, 0.27, 0.5, 0.73, 0.97]) for (const fx of [0.04, 0.5, 0.96]) pts.push([fx, fy]);
     for (const [fx, fy] of pts) {
       const x = vr.left + vr.width * fx, y = vr.top + vr.height * fy;
       if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
@@ -48,7 +51,14 @@
     }
   }
 
-  const hasContent = el => !!(el.textContent.trim() || el.matches('a[href], img') || el.querySelector('a[href], img'));
+  // Visible text only: Instagram's icons carry an SVG <title> ("Audio is muted") that isn't on screen
+  const textOf = el => {
+    let t = '';
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) if (!n.parentElement?.closest('svg')) { t += n.nodeValue; if (t.trim()) return t; }
+    return t;
+  };
+  const hasContent = el => !!(textOf(el).trim() || el.matches('a[href], img') || el.querySelector('a[href], img'));
   // Inside a mixed layer: icon-only buttons (mute, play, tags) and big empty layers are hidden and
   // click-through like the rest of the overlay; text, links and small buttons with text (caption,
   // user, Follow, "… more") stay visible and get clicks (igb-hit). The layer itself is click-through.

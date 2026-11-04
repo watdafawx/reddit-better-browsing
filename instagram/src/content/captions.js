@@ -86,8 +86,18 @@
   // A collapsed Reels caption is a role=button holding the text cut to one line (white-space: nowrap)
   // and a "… more" marker span (aria-hidden, visible only when text was cut). Clicking it opens the
   // full caption in place, so we click it for the user.
+  // Logged-in Reels layout: the caption beside the video is a role=button holding a [dir=auto] text
+  // block cut by CSS line-clamp; clicking it opens the caption in place as well.
+  const clamped = el => { const cs = getComputedStyle(el); return cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2; };
   const clicked = new WeakSet();
   function expand() {
+    if (!/^\/reels?\//.test(location.pathname)) return;
+    for (const txt of document.querySelectorAll('main [role="button"] [dir="auto"]')) {
+      const btn = txt.closest('[role="button"]');
+      if (clicked.has(btn) || btn.querySelector('svg, img, video') || !clamped(txt)) continue;
+      clicked.add(btn);
+      btn.click();
+    }
     for (const more of document.querySelectorAll('main [role="button"] span[aria-hidden="true"]')) {
       const btn = more.closest('[role="button"]');
       const txt = more.previousElementSibling;
