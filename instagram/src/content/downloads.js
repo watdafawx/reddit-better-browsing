@@ -82,12 +82,18 @@
   }
 
   // One floating bar, moved over whichever media the mouse is on
+  const GAP = 8;
   let bar = null, cur = null, mx = -1, my = -1, raf = 0;
   function place() {
     raf = 0;
     if (!IGB.settings.downloadTools || document.documentElement.hasAttribute('data-igb-lb')) return hide();
     if (bar && bar.contains(document.elementFromPoint(mx, my))) return;
-    const c = contextAt(mx, my);
+    let c = contextAt(mx, my);
+    // The bar sits just outside the media's right edge: keep it while the mouse crosses the gap
+    if (!c && cur?.media.isConnected) {
+      const r = cur.media.getBoundingClientRect();
+      if (mx >= r.left && mx <= r.right + GAP + 40 && my >= r.top && my <= r.bottom) c = cur;
+    }
     if (!c) return hide();
     if (!bar) { bar = h('div', { class: 'igb-root igb-tools' }); document.body.append(bar); }
     if (!cur || cur.key !== c.key || cur.media !== c.media) {
@@ -95,11 +101,13 @@
       c.get().catch(() => {}); // warm the data so the click is instant
     }
     cur = c;
+    // A column beside the media's top-right corner, off the picture; inside the edge only if
+    // there's no room on the right (media running to the window edge).
     const r = c.media.getBoundingClientRect();
-    // Stories have their own header (name, pause, mute) across the top: sit at the bottom there
-    const y = onStory() ? Math.min(r.bottom, innerHeight) - 72 : Math.max(r.top, 0) + 8;
-    bar.style.transform = `translate(${Math.round(r.left + 8)}px, ${Math.round(y)}px)`;
     bar.hidden = false;
+    const w = bar.offsetWidth || 36;
+    const x = r.right + GAP + w <= innerWidth ? r.right + GAP : r.right - w - GAP;
+    bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(r.top, 0) + GAP)}px)`;
   }
   function hide() { if (bar) bar.hidden = true; cur = null; }
   addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; if (!raf) raf = requestAnimationFrame(place); }, { passive: true });
