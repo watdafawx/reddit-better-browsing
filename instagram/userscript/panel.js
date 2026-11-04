@@ -1,10 +1,11 @@
-/* Userscript only: the popup's settings form in an in-page panel. Alt+W opens and closes it.
+/* Userscript only: the popup's settings form in an in-page panel (no extension pages to iframe).
+   settings.js calls IGB.openSettings from Alt+W and the sidebar gear.
    PANEL_HTML and PANEL_CSS are filled in by build.js from popup.html / popup.css. */
 (() => {
   let host = null;
   function toggle() {
     if (host) { host.remove(); host = null; return; }
-    host = IGB.h('div', { class: 'igb-root', style: { position: 'fixed', inset: '0', zIndex: '2147483600', background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '8vh' } });
+    host = IGB.h('div', { class: 'igb-root igb-settings', style: { position: 'fixed', inset: '0', zIndex: '2147483600', background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '8vh' } });
     const root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${PANEL_CSS}
       :host { all: initial; }
@@ -17,8 +18,5 @@
     document.body.append(host);
     IGB.mountSettings(root);
   }
-  addEventListener('keydown', e => {
-    if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyW') { e.preventDefault(); e.stopPropagation(); toggle(); }
-    else if (host && e.key === 'Escape') toggle();
-  }, true);
+  IGB.openSettings = toggle;
 })();

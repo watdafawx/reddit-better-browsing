@@ -15,6 +15,8 @@ IGB.DEFAULTS = {
   lightboxFeed: true,         // clicking a photo in the home feed opens the lightbox
   lightboxCaption: true,
 
+  settingsGear: true,         // settings entry in Instagram's left sidebar (Alt+W works either way)
+
   // Downloads
   downloadTools: true,        // download / open buttons over media and in the lightbox, Alt+S
   downloadName: '{user}_{code}_{n}' // {user} {code} {n} (slide number) {date} (YYYYMMDD)

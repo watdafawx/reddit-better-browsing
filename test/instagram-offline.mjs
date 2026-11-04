@@ -32,6 +32,11 @@ const igScript = `<script>
   window.__igNav = 0; document.addEventListener('click', e => { if (e.target.closest('a[href]')) window.__igNav++; });
 </script>`;
 const feed = `<!doctype html><html><head><title>feed</title>${igScript}</head><body style="margin:0;background:#000;color:#fff">
+<nav id="side" style="position:fixed;left:0;top:200px;width:60px"><div>
+  <div><span><a href="/"><svg width="24" height="24" viewBox="0 0 24 24"><title>Home</title><path d="M2 2h20v20H2z"/></svg><span>Home</span></a></span></div>
+  <div><span><a href="/reels/"><svg width="24" height="24" viewBox="0 0 24 24"><title>Reels</title><path d="M2 2h20v20H2z"/></svg><span>Reels</span></a></span></div>
+  <div><span><a href="/explore/"><svg width="24" height="24" viewBox="0 0 24 24"><title>Search</title><path d="M2 2h20v20H2z"/></svg><span>Search</span></a></span></div>
+</div></nav>
 <main style="width:470px;margin:20px auto">
 <article id="vid">
   <header><a href="/p/VIDEOBBBBBB/"><time>1h</time></a></header>
@@ -232,6 +237,28 @@ name = (await dl.catch(() => null))?.suggestedFilename();
 check('lightbox D key downloads', name === 'carol_SINGLECCCCC_1.jpg', name);
 await page.keyboard.press('Escape');
 
+// ---------- settings panel: sidebar gear, Alt+W ----------
+await page.goto('https://www.instagram.com/');
+await page.waitForSelector('.igb-gear', { timeout: 3000 }).catch(() => {});
+const gear = await page.evaluate(() => { const g = document.querySelector('.igb-gear'); return g && { text: g.querySelector('a > span').textContent, last: g === g.parentElement.lastElementChild, href: g.querySelector('a').getAttribute('href'), svg: g.querySelector('svg title')?.textContent }; });
+check('sidebar gear entry cloned from Search', gear?.text === 'Better Browsing' && gear.last && gear.href === '#' && gear.svg === 'Better Browsing', gear);
+await page.click('.igb-gear a');
+await page.waitForSelector('.igb-settings iframe', { timeout: 3000 }).catch(() => {});
+let frame = null;
+for (let i = 0; i < 30 && !frame; i++) { frame = page.frames().find(f => f.url().endsWith('/popup/popup.html')); if (!frame) await page.waitForTimeout(100); }
+if (frame) await frame.waitForSelector('[data-key="settingsGear"]', { timeout: 3000 }).catch(() => {});
+const fInputs = frame ? await frame.locator('[data-key]').count() : 0;
+check('gear opens settings panel (popup in iframe)', fInputs === 11 && page.url().endsWith('/'), { fInputs, url: page.url() });
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+const escP = await page.$('.igb-settings');
+await page.keyboard.press('Alt+W');
+await page.waitForTimeout(200);
+const altP = await page.$('.igb-settings');
+await page.keyboard.press('Alt+W');
+await page.waitForTimeout(200);
+check('Esc closes, Alt+W toggles panel', !escP && !!altP && !(await page.$('.igb-settings')), { esc: !!escP, alt: !!altP });
+
 // ---------- popup → live settings change ----------
 // Unpacked extension id = sha256 of its path (UTF-16LE on Windows), first 32 hex digits mapped to a-p
 const idSrc = process.platform === 'win32' ? Buffer.from(ext, 'utf16le') : Buffer.from(ext);
@@ -262,9 +289,9 @@ if (fs.existsSync(usFile)) {
   check('userscript: controls + sound', us.controls && !us.muted && Math.abs(us.volume - 0.4) < 0.01 && us.css, us);
   await p2.keyboard.press('Alt+W');
   await p2.waitForTimeout(300);
-  const panel = await p2.evaluate(() => { const r = document.querySelector('.igb-root')?.shadowRoot; return { inputs: r?.querySelectorAll('[data-key]').length, vol: r?.querySelector('[data-key="videoVolume"]')?.value }; });
-  check('userscript: Alt+W settings panel', panel.inputs === 10 && panel.vol === '40', panel);
-  await p2.evaluate(() => { const sel = document.querySelector('.igb-root')?.shadowRoot?.querySelector('[data-key="videoMode"]'); if (!sel) return; sel.value = 'muted'; sel.dispatchEvent(new Event('change')); });
+  const panel = await p2.evaluate(() => { const r = document.querySelector('.igb-settings')?.shadowRoot; return { inputs: r?.querySelectorAll('[data-key]').length, vol: r?.querySelector('[data-key="videoVolume"]')?.value }; });
+  check('userscript: Alt+W settings panel', panel.inputs === 11 && panel.vol === '40', panel);
+  await p2.evaluate(() => { const sel = document.querySelector('.igb-settings')?.shadowRoot?.querySelector('[data-key="videoMode"]'); if (!sel) return; sel.value = 'muted'; sel.dispatchEvent(new Event('change')); });
   await p2.waitForTimeout(400);
   const attr2 = await p2.evaluate(() => document.documentElement.dataset.igbVideo);
   check('userscript: settings change applies live', /"mode":"muted"/.test(attr2), attr2);

@@ -63,7 +63,7 @@ for (const e of extensions) {
   const panelCss = read(`${ig}/popup/popup.css`).replace(/:root/g, ':host').replace(/^body \{/m, '.panel > div {');
   const parts = [
     `${ig}/main-world.js`, `${ig}/content/defaults.js`, 'instagram/userscript/shim.js', `${ig}/content/core.js`,
-    `${ig}/content/video.js`, `${ig}/content/lightbox.js`, `${ig}/content/downloads.js`, `${ig}/popup/popup.js`
+    `${ig}/content/video.js`, `${ig}/content/lightbox.js`, `${ig}/content/downloads.js`, `${ig}/content/settings.js`, `${ig}/popup/popup.js`
   ];
   const header = `// ==UserScript==
 // @name         ${man.name}

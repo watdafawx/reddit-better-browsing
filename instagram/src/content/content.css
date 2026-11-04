@@ -87,3 +87,17 @@ html.igb-native .igb-ov { opacity: 0 !important; }
 .igb-tools-inline { display: inline-flex; gap: 4px; }
 .igb-tools-inline .igb-tool { height: 24px; line-height: 24px; background: rgba(255, 255, 255, .12); }
 .igb-tools-inline .igb-tool:hover { background: rgba(255, 255, 255, .25); }
+
+/* ---------- settings panel (Alt+W / sidebar gear) ---------- */
+.igb-settings {
+  position: fixed; inset: 0; z-index: 2147483600;
+  background: rgba(0, 0, 0, .45);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh;
+}
+.igb-settings-box { position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 12px 40px rgba(0, 0, 0, .4); }
+.igb-settings-box iframe { display: block; width: 380px; height: min(640px, 84vh); border: 0; color-scheme: normal; }
+.igb-settings-x {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: transparent; color: #888; font-size: 16px; cursor: pointer;
+}
+.igb-settings-x:hover { background: rgba(128, 128, 128, .2); }
