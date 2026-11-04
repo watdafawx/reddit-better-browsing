@@ -3,6 +3,27 @@
 html.igb-native .igb-ov,
 html.igb-native .igb-ov * { pointer-events: none !important; }
 html.igb-native .igb-ov { opacity: 0 !important; }
+/* Text laid over a video (the Reels caption): visible, its links and buttons clickable,
+   everything else clicks through to the controls */
+html.igb-native .igb-cap { pointer-events: none !important; }
+html.igb-native .igb-cap :is(a, button, [role="button"], [role="link"]) { pointer-events: auto !important; }
+
+/* ---------- captions ---------- */
+a.igb-link { color: #4cb5f9; text-decoration: none; pointer-events: auto; }
+a.igb-link:hover { text-decoration: underline; }
+.igb-lb-cap a.igb-link { color: #8ab4ff; }
+
+/* ---------- Reels auto-scroll button ---------- */
+.igb-as {
+  position: fixed; right: 20px; bottom: 20px; z-index: 2147482500;
+  height: 34px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 17px; cursor: pointer;
+  background: rgba(38, 38, 38, .88); color: #a8a8a8;
+  font: 600 13px/32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  backdrop-filter: blur(6px);
+}
+.igb-as.on { color: #fff; border-color: #4cb5f9; }
+.igb-as:hover { background: rgba(60, 60, 60, .95); }
+.igb-as[hidden] { display: none; }
 
 /* ---------- lightbox ---------- */
 .igb-lb {

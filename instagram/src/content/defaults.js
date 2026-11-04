@@ -12,6 +12,8 @@ IGB.DEFAULTS = {
   reelsAutoScroll: true,      // Reels tab: when a reel ends, scroll to the next one (like the phone app)
 
   notInterested: true,        // "Not interested" button on feed posts, reels and in the lightbox
+  captionExpand: true,        // Reels: open the full caption instead of one line with "… more"
+  captionLinks: true,         // web addresses in captions and comments become links (also in the lightbox)
 
   // Lightbox
   lightboxGrid: true,         // profile / explore / tag grids open in the lightbox instead of Instagram's modal
@@ -21,6 +23,8 @@ IGB.DEFAULTS = {
   settingsGear: true,         // settings entry in Instagram's left sidebar (Alt+W works either way)
 
   // Downloads
+  embedLink: true,            // 🔗 button: copy a link that Discord shows as an embed
+  embedHost: 'kkinstagram.com', // embed-fixer domain used in that link (InstaFix forks: kkinstagram.com, instagramez.com, ...)
   downloadTools: true,        // download / open buttons over media and in the lightbox, Alt+S
   downloadName: '{user}_{code}_{n}' // {user} {code} {n} (slide number) {date} (YYYYMMDD)
 };

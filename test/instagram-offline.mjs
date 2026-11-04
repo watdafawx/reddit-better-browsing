@@ -21,7 +21,7 @@ const posts = {
     carousel_media: [{ image_versions2: img('a1') }, { image_versions2: img('a2') }, { image_versions2: img('a3') }] },
   VIDEOBBBBBB: { code: 'VIDEOBBBBBB', user: { username: 'bob' }, caption: { text: 'Video caption' }, like_count: 5,
     image_versions2: img('b1'), video_versions: [{ url: 'https://cdn.example.test/b_low.mp4', width: 360, height: 640 }, { url: 'https://cdn.example.test/b_high.mp4', width: 720, height: 1280 }] },
-  SINGLECCCCC: { code: 'SINGLECCCCC', user: { username: 'carol' }, caption: { text: 'Single' }, like_count: 1, image_versions2: img('c1') },
+  SINGLECCCCC: { code: 'SINGLECCCCC', user: { username: 'carol' }, caption: { text: 'Single, see example.com/x. Thanks @dave #tag' }, like_count: 1, image_versions2: img('c1') },
 };
 const byId = Object.fromEntries(Object.values(posts).map(p => [mediaId(p.code), p]));
 
@@ -71,9 +71,20 @@ const explore = `<!doctype html><html><head><title>explore</title>${igScript}</h
   <a href="/p/SINGLECCCCC/"><img src="https://cdn.example.test/c1_small.jpg" style="width:240px;height:300px;display:block"></a>
 </main></body></html>`;
 // Reels tab: a scroll-snap column, one reel per screen; the URL names the reel on screen
+// Caption laid over the video: one line cut with "… more" in a role=button; a click opens it in place
 const reel = n => `<div style="height:860px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center">
-  <div style="position:relative;width:420px;height:746px"><video id="r${n}" src="https://cdn.example.test/reel${n}.mp4" playsinline style="width:100%;height:100%;display:block;background:#222"></video></div></div>`;
-const reels = `<!doctype html><html><head><title>reels</title>${igScript}</head><body style="margin:0;background:#000">
+  <div style="position:relative;width:420px;height:746px"><video id="r${n}" src="https://cdn.example.test/reel${n}.mp4" playsinline style="width:100%;height:100%;display:block;background:#222"></video>
+    <div role="presentation" style="position:absolute;inset:0"></div>
+    <div id="cap${n}" style="position:absolute;left:0;right:0;bottom:0;height:0"><div style="position:absolute;left:10px;bottom:20px;width:280px;padding:10px;color:#fff;font:14px/18px sans-serif">
+      <a href="/user${n}/" style="color:#fff">user${n}</a>
+      <div role="button" tabindex="0" class="capbtn" style="display:flex"><span style="white-space:nowrap;overflow:hidden;text-overflow:clip;width:200px">Line one of a long caption that is cut off here</span><span aria-hidden="true">… more</span></div>
+    </div></div>
+  </div></div>`;
+const capScript = `<script>document.addEventListener('click', e => { const b = e.target.closest('.capbtn'); if (!b) return;
+  const full = document.createElement('div'); full.className = 'capfull';
+  full.innerHTML = '<span style="white-space:pre-line">Line one of a long caption that is cut off here\\nLinks: linktr.ee/foo, https://example.com/a?b=1. Mail me@mail.com <a href="/explore/tags/tag/">#tag</a></span>';
+  b.replaceWith(full); });</script>`;
+const reels = `<!doctype html><html><head><title>reels</title>${igScript}${capScript}</head><body style="margin:0;background:#000">
 <main><div id="col" style="height:900px;overflow-y:auto;scroll-snap-type:y mandatory">${[1, 2, 3].map(reel).join('')}</div></main></body></html>`;
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -101,6 +112,7 @@ const fixtures = async route => {
   return route.fulfill({ status: 404, body: '' });
 };
 await ctx.route(/instagram\.com|example\.test/, fixtures);
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'https://www.instagram.com' });
 await ctx.addCookies([{ name: 'csrftoken', value: 'testcsrf', domain: '.instagram.com', path: '/' }]);
 
 const logs = [];
@@ -225,7 +237,7 @@ const photo = await page.locator('#photo img').boundingBox();
 await page.mouse.move(photo.x + 200, photo.y + 200);
 await page.waitForSelector('.igb-tools:not([hidden]) .igb-tool', { timeout: 3000 });
 const toolCount = await page.locator('.igb-tools .igb-tool').count();
-check('hover bar on carousel photo (this / all / open / not interested)', toolCount === 4, toolCount);
+check('hover bar on carousel photo (this / all / open / link / not interested)', toolCount === 5, toolCount);
 let dl = page.waitForEvent('download', { timeout: 5000 });
 await page.locator('.igb-tools .igb-tool').first().click();
 let name = (await dl.catch(() => null))?.suggestedFilename();
@@ -246,11 +258,26 @@ name = (await dl.catch(() => null))?.suggestedFilename();
 check('Alt+S downloads media under mouse', name === 'carol_SINGLECCCCC_1.jpg', name);
 await page.mouse.click(single.x + 200, single.y + 200);
 await page.waitForSelector('.igb-lb .igb-tools-inline .igb-tool', { timeout: 5000 });
+const lbLinks = await page.evaluate(() => [...document.querySelectorAll('.igb-lb-cap a')].map(a => a.getAttribute('href') + (a.target ? ' new-tab' : '')));
+check('lightbox caption: address, @mention and #hashtag are links', lbLinks.join() === 'https://example.com/x new-tab,/dave/,/explore/tags/tag/', lbLinks);
 dl = page.waitForEvent('download', { timeout: 5000 });
 await page.keyboard.press('d');
 name = (await dl.catch(() => null))?.suggestedFilename();
 check('lightbox D key downloads', name === 'carol_SINGLECCCCC_1.jpg', name);
 await page.keyboard.press('Escape');
+
+// ---------- buttons stay up; link for Discord ----------
+await page.goto('https://www.instagram.com/');
+await page.waitForTimeout(800);
+await page.mouse.move(5, 5);
+await page.waitForTimeout(500);
+const stay = await page.evaluate(() => { const b = document.querySelector('.igb-tools'); const r = document.querySelector('#vid video').getBoundingClientRect(), br = b?.getBoundingClientRect();
+  return { shown: !!b && !b.hidden, n: b?.querySelectorAll('.igb-tool').length, besideVideo: !!br && br.left >= r.right && br.top >= r.top }; });
+check('buttons stay up beside the post in view, mouse elsewhere', stay.shown && stay.n >= 3 && stay.besideVideo, stay);
+await page.locator('.igb-tools .igb-embed-btn').click().catch(() => {});
+await page.waitForTimeout(400);
+const copied = await page.evaluate(async () => ({ toast: document.querySelector('.igb-toast')?.textContent, clip: await navigator.clipboard.readText().catch(e => 'ERR ' + e.message) }));
+check('🔗 copies Discord embed link (reel path for a video)', copied.clip === 'https://kkinstagram.com/reel/VIDEOBBBBBB/' && /Copied https:\/\/kkinstagram\.com\/reel\/VIDEOBBBBBB\//.test(copied.toast || ''), copied);
 
 // ---------- not interested ----------
 await page.goto('https://www.instagram.com/');
@@ -292,6 +319,34 @@ const r2 = await centerOf();
 const rReq = posted.slice(before).find(p => p.path === '/api/v1/discover/explore_report/');
 check('reels tab: not interested marks the reel and moves on', rReq?.body.m_pk === mediaId('REELAAAAAAA') && r2 === 2, { rReq, r2 });
 
+// captions: opened in full, addresses linked, caption kept visible and clickable over the video
+await page.mouse.move(5, 5);
+await page.waitForTimeout(900);
+const cap = await page.evaluate(() => {
+  const c = document.getElementById('cap3'), full = c.querySelector('.capfull');
+  const links = [...c.querySelectorAll('a.igb-link')].map(a => a.getAttribute('href'));
+  const user = c.querySelector('a[href="/user3/"]'), ur = user.getBoundingClientRect();
+  return { full: !!full, btn: !!c.querySelector('.capbtn'), links, text: full?.textContent, cls: c.className, opacity: getComputedStyle(c).opacity,
+    userHit: document.elementFromPoint(ur.left + 5, ur.top + 5) === user };
+});
+check('reels caption opened in full', cap.full && !cap.btn, cap);
+check('caption addresses become links (not e-mail)', cap.links.join() === 'https://linktr.ee/foo,https://example.com/a?b=1' && /Mail me@mail\.com/.test(cap.text || ''), cap);
+check('caption over the video stays visible and clickable', /igb-cap/.test(cap.cls) && !/igb-ov/.test(cap.cls) && cap.opacity === '1' && cap.userHit, cap);
+
+// auto-scroll button switches the setting
+const asText = () => page.evaluate(() => { const b = document.querySelector('.igb-as'); return b && !b.hidden ? b.textContent : null; });
+const as0 = await asText();
+await page.click('.igb-as').catch(() => {});
+await page.waitForTimeout(500);
+const as1 = await asText();
+const loop1 = await page.evaluate(() => document.getElementById('r3').loop);
+await page.click('.igb-as').catch(() => {});
+await page.waitForTimeout(500);
+const as2 = await asText();
+check('reels auto-scroll button toggles it', as0 === 'Auto-scroll: On' && as1 === 'Auto-scroll: Off' && loop1 === true && as2 === 'Auto-scroll: On', { as0, as1, loop1, as2 });
+const asOff = await page.evaluate(() => { history.pushState({}, '', '/'); document.body.append(document.createElement('div')); return new Promise(r => setTimeout(() => r(document.querySelector('.igb-as')?.hidden), 700)); });
+check('auto-scroll button only on the Reels tab', asOff === true, asOff);
+
 // ---------- settings panel: sidebar gear, Alt+W ----------
 await page.goto('https://www.instagram.com/');
 await page.waitForSelector('.igb-gear', { timeout: 3000 }).catch(() => {});
@@ -303,7 +358,7 @@ let frame = null;
 for (let i = 0; i < 30 && !frame; i++) { frame = page.frames().find(f => f.url().endsWith('/popup/popup.html')); if (!frame) await page.waitForTimeout(100); }
 if (frame) await frame.waitForSelector('[data-key="settingsGear"]', { timeout: 3000 }).catch(() => {});
 const fInputs = frame ? await frame.locator('[data-key]').count() : 0;
-check('gear opens settings panel (popup in iframe)', fInputs === 13 && page.url().endsWith('/'), { fInputs, url: page.url() });
+check('gear opens settings panel (popup in iframe)', fInputs === 17 && page.url().endsWith('/'), { fInputs, url: page.url() });
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 const escP = await page.$('.igb-settings');
@@ -345,7 +400,7 @@ if (fs.existsSync(usFile)) {
   await p2.keyboard.press('Alt+W');
   await p2.waitForTimeout(300);
   const panel = await p2.evaluate(() => { const r = document.querySelector('.igb-settings')?.shadowRoot; return { inputs: r?.querySelectorAll('[data-key]').length, vol: r?.querySelector('[data-key="videoVolume"]')?.value }; });
-  check('userscript: Alt+W settings panel', panel.inputs === 13 && panel.vol === '40', panel);
+  check('userscript: Alt+W settings panel', panel.inputs === 17 && panel.vol === '40', panel);
   await p2.evaluate(() => { const sel = document.querySelector('.igb-settings')?.shadowRoot?.querySelector('[data-key="videoMode"]'); if (!sel) return; sel.value = 'muted'; sel.dispatchEvent(new Event('change')); });
   await p2.waitForTimeout(400);
   const attr2 = await p2.evaluate(() => document.documentElement.dataset.igbVideo);
