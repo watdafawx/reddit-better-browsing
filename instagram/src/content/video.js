@@ -40,11 +40,27 @@
         const r = or.width * or.height ? or : er;
         // must stay within the video's box (with slack), so we never hide captions or action bars
         if (r.top < vr.top - 8 || r.bottom > vr.bottom + 8 || r.left < vr.left - 8 || r.right > vr.right + 8) continue;
-        // Text or links laid over the video (the Reels caption with the user, Follow, hashtags) stay
-        // visible and clickable; only the empty parts of that layer let clicks through to the controls.
-        if (o.classList.contains('igb-cap') || o.querySelector('a[href], button') || o.textContent.trim()) o.classList.add('igb-cap');
+        // A layer with text or links in it (on Reels: the caption, user and Follow, in the same block as
+        // the mute button and the tap-to-pause layer) is sorted piece by piece; an empty one goes whole.
+        if (o.classList.contains('igb-cap') || hasContent(o)) markCap(o, vr);
         else o.classList.add('igb-ov');
       }
+    }
+  }
+
+  const hasContent = el => !!(el.textContent.trim() || el.matches('a[href], img') || el.querySelector('a[href], img'));
+  // Inside a mixed layer: icon-only buttons (mute, play, tags) and big empty layers are hidden and
+  // click-through like the rest of the overlay; text, links and small buttons with text (caption,
+  // user, Follow, "… more") stay visible and get clicks (igb-hit). The layer itself is click-through.
+  function markCap(o, vr) {
+    o.classList.add('igb-cap');
+    const big = vr.width * vr.height * 0.35;
+    for (const el of o.querySelectorAll('*')) {
+      if (el.closest('.igb-ov')) continue;
+      const r = el.getBoundingClientRect(), area = r.width * r.height;
+      if (!hasContent(el)) {
+        if (!el.closest('a[href]') && (el.matches('button, [role="button"]') || area > big)) el.classList.add('igb-ov');
+      } else if (el.matches('a[href], button, [role="button"], [role="link"]') && area < big) el.classList.add('igb-hit');
     }
   }
 

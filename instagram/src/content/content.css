@@ -6,7 +6,8 @@ html.igb-native .igb-ov { opacity: 0 !important; }
 /* Text laid over a video (the Reels caption): visible, its links and buttons clickable,
    everything else clicks through to the controls */
 html.igb-native .igb-cap { pointer-events: none !important; }
-html.igb-native .igb-cap :is(a, button, [role="button"], [role="link"]) { pointer-events: auto !important; }
+html.igb-native .igb-cap .igb-hit { pointer-events: auto !important; }
+html.igb-native .igb-cap .igb-hit .igb-ov { pointer-events: none !important; }
 
 /* ---------- captions ---------- */
 a.igb-link { color: #4cb5f9; text-decoration: none; pointer-events: auto; }
@@ -116,9 +117,9 @@ a.igb-link:hover { text-decoration: underline; }
 .igb-tool.busy { opacity: .4; cursor: progress; }
 .igb-ico { display: block; width: 24px; height: 24px; }
 .igb-ico svg { display: block; }
-.igb-tool-label { margin-top: 4px; color: rgb(var(--ig-secondary-text, 168, 168, 168)); }
-.igb-as-btn.on { color: rgb(0, 149, 246); }
-.igb-as-btn.on .igb-tool-label { color: rgb(0, 149, 246); }
+.igb-tool-label { margin-top: 2px; font-weight: 400; color: inherit; }   /* like Instagram's counts under its icons */
+.igb-as-btn:not(.on) { opacity: .45; }
+.igb-as-btn:not(.on):hover { opacity: .3; }
 
 /* In the lightbox's side panel: a row, on its dark background */
 .igb-tools-inline { display: inline-flex; gap: 2px; margin-left: -8px; color: #f5f5f5; }

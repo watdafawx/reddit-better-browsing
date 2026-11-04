@@ -74,11 +74,13 @@ const explore = `<!doctype html><html><head><title>explore</title>${igScript}</h
 // Caption laid over the video: one line cut with "… more" in a role=button; a click opens it in place
 const reel = n => `<div style="height:860px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center">
   <div style="position:relative;width:420px;height:746px"><video id="r${n}" src="https://cdn.example.test/reel${n}.mp4" playsinline style="width:100%;height:100%;display:block;background:#222"></video>
-    <div role="presentation" style="position:absolute;inset:0"></div>
-    <div id="cap${n}" style="position:absolute;left:0;right:0;bottom:0;height:0"><div style="position:absolute;left:10px;bottom:20px;width:280px;padding:10px;color:#fff;font:14px/18px sans-serif">
-      <a href="/user${n}/" style="color:#fff">user${n}</a>
-      <div role="button" tabindex="0" class="capbtn" style="display:flex"><span style="white-space:nowrap;overflow:hidden;text-overflow:clip;width:200px">Line one of a long caption that is cut off here</span><span aria-hidden="true">… more</span></div>
-    </div></div>
+    <div class="ovl" role="button" tabindex="0" style="position:absolute;inset:0">
+      <div role="button" aria-label="Audio is muted" class="mute" style="position:absolute;right:10px;bottom:60px;width:28px;height:28px;background:#555"><svg width="12" height="12"><path d="M0 0h12v12z"/></svg></div>
+      <div id="cap${n}" style="position:absolute;left:0;right:0;bottom:0;height:0"><div style="position:absolute;left:10px;bottom:20px;width:280px;padding:10px;color:#fff;font:14px/18px sans-serif">
+        <a href="/user${n}/" style="color:#fff">user${n}</a>
+        <div role="button" tabindex="0" class="capbtn" style="display:flex"><span style="white-space:nowrap;overflow:hidden;text-overflow:clip;width:200px">Line one of a long caption that is cut off here</span><span aria-hidden="true">… more</span></div>
+      </div></div>
+    </div>
   </div></div>`;
 const capScript = `<script>document.addEventListener('click', e => { const b = e.target.closest('.capbtn'); if (!b) return;
   const full = document.createElement('div'); full.className = 'capfull';
@@ -326,12 +328,17 @@ const cap = await page.evaluate(() => {
   const c = document.getElementById('cap3'), full = c.querySelector('.capfull');
   const links = [...c.querySelectorAll('a.igb-link')].map(a => a.getAttribute('href'));
   const user = c.querySelector('a[href="/user3/"]'), ur = user.getBoundingClientRect();
-  return { full: !!full, btn: !!c.querySelector('.capbtn'), links, text: full?.textContent, cls: c.className, opacity: getComputedStyle(c).opacity,
-    userHit: document.elementFromPoint(ur.left + 5, ur.top + 5) === user };
+  const v = document.getElementById('r3'), vr = v.getBoundingClientRect(), mute = document.querySelector('#r3 ~ .ovl .mute');
+  return { full: !!full, btn: !!c.querySelector('.capbtn'), links, text: full?.textContent,
+    cls: c.closest('.igb-cap') ? 'igb-cap' : 'none', hiddenAncestor: !!c.closest('.igb-ov'), opacity: getComputedStyle(c).opacity,
+    userHit: document.elementFromPoint(ur.left + 5, ur.top + 5) === user,
+    centerIsVideo: document.elementFromPoint(vr.left + vr.width / 2, vr.top + vr.height / 2) === v,
+    muteHidden: mute.classList.contains('igb-ov') && getComputedStyle(mute).opacity === '0', controls: v.controls };
 });
 check('reels caption opened in full', cap.full && !cap.btn, cap);
 check('caption addresses become links (not e-mail)', cap.links.join() === 'https://linktr.ee/foo,https://example.com/a?b=1' && /Mail me@mail\.com/.test(cap.text || ''), cap);
-check('caption over the video stays visible and clickable', /igb-cap/.test(cap.cls) && !/igb-ov/.test(cap.cls) && cap.opacity === '1' && cap.userHit, cap);
+check('caption over the video stays visible and clickable', cap.cls === 'igb-cap' && !cap.hiddenAncestor && cap.opacity === '1' && cap.userHit, cap);
+check('reels: tap layer click-through, mute icon hidden, controls on', cap.centerIsVideo && cap.muteHidden && cap.controls, cap);
 
 // auto-scroll button switches the setting
 // in the button column beside the reel

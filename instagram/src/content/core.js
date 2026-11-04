@@ -54,7 +54,7 @@
     open: '<path d="M14 3h7v7m0-7-9 9"/><path d="M19 14v4.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5H10"/>',
     link: '<path d="M10.5 13.5a4.6 4.6 0 0 0 6.5 0l3-3a4.6 4.6 0 0 0-6.5-6.5L12 5.5"/><path d="M13.5 10.5a4.6 4.6 0 0 0-6.5 0l-3 3a4.6 4.6 0 0 0 6.5 6.5l1.5-1.5"/>',
     notInterested: '<circle cx="12" cy="12" r="9.5"/><path d="m5.3 5.3 13.4 13.4"/>',
-    autoScroll: '<rect x="5.5" y="2" width="13" height="14" rx="2.5"/><path d="m8 18.5 4 3 4-3"/>'
+    autoScroll: '<path d="m6 5 6 6 6-6"/><path d="m6 12 6 6 6-6"/>'
   };
   IGB.icon = name => {
     const s = document.createElement('span');
