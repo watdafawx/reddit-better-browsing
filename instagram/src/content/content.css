@@ -12,6 +12,8 @@ html.igb-native .igb-cap .igb-hit .igb-ov { pointer-events: none !important; }
 /* ---------- captions ---------- */
 a.igb-link { color: #4cb5f9; text-decoration: none; pointer-events: auto; }
 a.igb-link:hover { text-decoration: underline; }
+[data-igb-caption] { cursor: auto !important; user-select: text !important; -webkit-user-select: text !important; }
+[data-igb-caption] a[href] { cursor: pointer !important; }
 .igb-lb-cap a.igb-link { color: #8ab4ff; }
 
 

@@ -88,9 +88,11 @@ const capScript = `<script>document.addEventListener('click', e => { const b = e
   b.replaceWith(full); });</script>`;
 // Logged-in layout: the caption sits beside the video, cut by line-clamp inside a role=button
 const sideCap = `<div id="side" style="position:fixed;left:20px;bottom:20px;width:220px;max-height:110px;overflow:hidden;color:#fff;font:14px/18px sans-serif"><div role="presentation">
-  <div role="button" tabindex="0" class="clampbtn"><div dir="auto" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${'A long caption beside the reel. '.repeat(8)}</div></div></div></div>
-<script>document.addEventListener('click', e => { const b = e.target.closest('.clampbtn'); if (!b) return;
-  const t = b.querySelector('[dir=auto]'); t.style.webkitLineClamp = 'none'; t.style.display = 'block'; document.getElementById('side').style.maxHeight = '475px'; });</script>`;
+  <div role="button" tabindex="0" class="clampbtn"><div dir="auto" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${'A long caption beside the reel. '.repeat(8)}<a href="/explore/tags/cozy/">#cozy</a></div></div></div></div>
+<script>document.addEventListener('click', e => { if (e.target.closest('.clampbtn a')) { window.__tagClicks = (window.__tagClicks || 0) + 1; e.preventDefault(); }
+  const b = e.target.closest('.clampbtn'); if (!b) return;
+  const t = b.querySelector('[dir=auto]'), open = t.style.webkitLineClamp === 'none';   /* Instagram toggles open / folded */
+  t.style.webkitLineClamp = open ? '3' : 'none'; t.style.display = open ? '-webkit-box' : 'block'; document.getElementById('side').style.maxHeight = open ? '110px' : '475px'; });</script>`;
 const reels = `<!doctype html><html><head><title>reels</title>${igScript}${capScript}</head><body style="margin:0;background:#000">
 <main>${sideCap}<div id="col" style="height:900px;overflow-y:auto;scroll-snap-type:y mandatory">${[1, 2, 3].map(reel).join('')}</div></main></body></html>`;
 
@@ -345,6 +347,15 @@ check('caption addresses become links (not e-mail)', cap.links.join() === 'https
 check('caption over the video stays visible and clickable', cap.cls === 'igb-cap' && !cap.hiddenAncestor && cap.opacity === '1' && cap.userHit, cap);
 check('reels: tap layer click-through, mute icon (corner, SVG title) hidden, controls on', cap.centerIsVideo && cap.muteHidden && cap.controls, cap);
 const sideCapState = await page.evaluate(() => { const t = document.querySelector('#side [dir=auto]'); return { h: t.clientHeight, sh: t.scrollHeight, clamp: getComputedStyle(t).webkitLineClamp }; });
+// clicks on the open caption don't fold it; its links still reach the page
+const sideBox = await page.locator('#side [dir=auto]').boundingBox();
+await page.mouse.click(sideBox.x + 30, sideBox.y + 8);
+await page.waitForTimeout(300);
+const afterText = await page.evaluate(() => getComputedStyle(document.querySelector('#side [dir=auto]')).webkitLineClamp);
+await page.locator('#side a').click().catch(() => {});
+await page.waitForTimeout(300);
+const locked = await page.evaluate(() => ({ tag: window.__tagClicks || 0, marked: !!document.querySelector('#side [data-igb-caption]') }));
+check('reels: open caption stays open on click, Instagram links still reach the page', afterText === 'none' && locked.tag === 1 && locked.marked, { afterText, ...locked });
 check('reels: caption beside the video (line-clamp) opened in full', sideCapState.clamp === 'none' && sideCapState.h > 54 && sideCapState.h >= sideCapState.sh - 2, sideCapState);
 
 // auto-scroll button switches the setting
