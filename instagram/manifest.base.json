@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Instagram Better Browsing",
+  "version": "1.1.0",
+  "description": "Browser video controls on every Instagram video, sound on by default at your volume, a fast full-screen lightbox and one-click downloads.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Instagram Better Browsing",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "options_ui": {
+    "page": "popup/popup.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.instagram.com/*"
+      ],
+      "js": [
+        "main-world.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "*://www.instagram.com/*"
+      ],
+      "js": [
+        "content/defaults.js",
+        "content/core.js",
+        "content/video.js",
+        "content/lightbox.js",
+        "content/downloads.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

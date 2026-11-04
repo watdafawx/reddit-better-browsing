@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instagram Better Browsing</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <img src="../icons/icon48.png" alt="" width="22" height="22">
+  <h1>Instagram Better Browsing</h1>
+  <span id="saved" class="saved">Saved</span>
+</header>
+<main>
+<section>
+  <h2>Video</h2>
+  <label class="row">Sound
+    <select data-key="videoMode">
+      <option value="volume">Play with sound</option>
+      <option value="muted">Always muted</option>
+      <option value="off">No autoplay (click to play, with sound)</option>
+      <option value="default">Instagram decides (off)</option>
+    </select>
+  </label>
+  <label class="row">Volume <span><input type="range" min="0" max="100" data-key="videoVolume"><output></output>%</span></label>
+  <label class="check"><input type="checkbox" data-key="nativeControls"> Browser video controls (seek bar, volume, fullscreen, speed)</label>
+  <label class="check"><input type="checkbox" data-key="videoLoop"> Loop videos</label>
+  <label class="check"><input type="checkbox" data-key="videoPauseOffscreen"> Pause videos scrolled out of view</label>
+  <p class="hint">Browsers block sound until you've clicked the page once; videos start muted until then and unmute on your first click.</p>
+</section>
+<section>
+  <h2>Lightbox</h2>
+  <label class="check"><input type="checkbox" data-key="lightboxGrid"> Open profile / explore grid posts in the lightbox</label>
+  <label class="check"><input type="checkbox" data-key="lightboxFeed"> Click a photo in the feed to open it in the lightbox</label>
+  <label class="check"><input type="checkbox" data-key="lightboxCaption"> Show captions</label>
+  <p class="hint">Wheel or <kbd>←</kbd>/<kbd>→</kbd>: next/previous slide, then next post · <kbd>↑</kbd>/<kbd>↓</kbd>: post · <kbd>Space</kbd> play/pause · click photo to zoom · <kbd>Esc</kbd>, Back or click outside: close.<br>Ctrl/⌘/middle-click still opens Instagram's own page.</p>
+</section>
+<section>
+  <h2>Downloads</h2>
+  <label class="check"><input type="checkbox" data-key="downloadTools"> Download and open-in-tab buttons on photos, videos, stories and in the lightbox</label>
+  <label class="row">File name <input type="text" data-key="downloadName" spellcheck="false"></label>
+  <p class="hint"><code>{user}</code> <code>{code}</code> <code>{n}</code> slide number · <code>{date}</code> posted, YYYYMMDD. <kbd>Alt</kbd>+<kbd>S</kbd> downloads the story, the lightbox item or the media under the mouse; <kbd>D</kbd> in the lightbox.</p>
+</section>
+</main>
+<script src="../content/defaults.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

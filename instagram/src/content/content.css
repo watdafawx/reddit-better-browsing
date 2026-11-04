@@ -1,0 +1,89 @@
+/* ---------- native video controls ---------- */
+/* Instagram's overlay above a video: click-through and invisible, so the browser controls work */
+html.igb-native .igb-ov,
+html.igb-native .igb-ov * { pointer-events: none !important; }
+html.igb-native .igb-ov { opacity: 0 !important; }
+
+/* ---------- lightbox ---------- */
+.igb-lb {
+  position: fixed; inset: 0; z-index: 2147483000;
+  background: rgba(0, 0, 0, .96);
+  display: flex; flex-direction: column;
+  color: #f2f2f2; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none; -webkit-user-select: none;
+}
+.igb-lb * { box-sizing: border-box; }
+.igb-lb-stage {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px 64px 0;
+}
+.igb-lb-stage img, .igb-lb-stage video {
+  max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+  background: #000; border-radius: 2px;
+}
+.igb-lb-stage img { cursor: zoom-in; }
+.igb-lb.igb-zoom .igb-lb-stage { overflow: auto; align-items: flex-start; justify-content: flex-start; }
+.igb-lb.igb-zoom .igb-lb-stage img { max-width: none; max-height: none; cursor: zoom-out; margin: auto; }
+.igb-lb-msg { color: #bbb; text-align: center; }
+.igb-lb-msg a { color: #8ab4ff; }
+.igb-spin {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18); border-top-color: #fff;
+  animation: igb-spin .8s linear infinite;
+}
+@keyframes igb-spin { to { transform: rotate(360deg); } }
+
+.igb-lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 22px; line-height: 44px; text-align: center;
+}
+.igb-lb-nav:hover { background: rgba(255,255,255,.25); }
+.igb-lb-prev { left: 12px; }
+.igb-lb-next { right: 12px; }
+.igb-lb-close {
+  position: absolute; top: 10px; right: 12px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 20px;
+}
+.igb-lb-close:hover { background: rgba(255,255,255,.25); }
+
+.igb-lb-dots { display: flex; gap: 5px; justify-content: center; padding: 8px 0 0; min-height: 14px; }
+.igb-lb-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3); }
+.igb-lb-dots i.on { background: #fff; }
+
+.igb-lb-bar {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 8px 18px 12px; max-height: 26vh; overflow: auto;
+}
+.igb-lb-user { font-weight: 600; color: #fff; text-decoration: none; white-space: nowrap; }
+.igb-lb-user:hover { text-decoration: underline; }
+.igb-lb-cap { flex: 1; min-width: 0; color: #ddd; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.igb-lb-cap.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.igb-lb-meta { white-space: nowrap; color: #999; display: flex; gap: 12px; }
+.igb-lb-meta a { color: #8ab4ff; text-decoration: none; }
+.igb-lb-meta a:hover { text-decoration: underline; }
+
+@media (max-width: 700px) {
+  .igb-lb-stage { padding: 52px 8px 0; }
+  .igb-lb-nav { display: none; }
+  .igb-lb-bar { flex-wrap: wrap; }
+}
+
+/* ---------- download / open buttons ---------- */
+.igb-tools {
+  position: fixed; left: 0; top: 0; z-index: 2147482000;
+  display: flex; gap: 4px;
+}
+.igb-tools[hidden] { display: none; }
+.igb-tool {
+  height: 28px; min-width: 28px; padding: 0 8px; border: 0; border-radius: 14px; cursor: pointer;
+  background: rgba(0, 0, 0, .62); color: #fff; font: 600 13px/28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  backdrop-filter: blur(6px);
+}
+.igb-tool:hover { background: rgba(0, 0, 0, .85); }
+.igb-tool.busy { opacity: .55; cursor: progress; }
+.igb-tools-inline { display: inline-flex; gap: 4px; }
+.igb-tools-inline .igb-tool { height: 24px; line-height: 24px; background: rgba(255, 255, 255, .12); }
+.igb-tools-inline .igb-tool:hover { background: rgba(255, 255, 255, .25); }

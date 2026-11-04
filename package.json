@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "build": "node build.js",
-    "test": "node test/offline.mjs dist/chrome"
+    "test": "node test/offline.mjs dist/chrome",
+    "test:instagram": "node test/instagram-offline.mjs dist/instagram-chrome"
   },
   "devDependencies": {
     "playwright": "1.49.1"

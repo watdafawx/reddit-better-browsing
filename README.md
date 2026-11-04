@@ -109,6 +109,10 @@ See [CLAUDE.md](CLAUDE.md) for how the pieces fit together and the rules to keep
 2. Run `npm run build` and `npm test`.
 3. Attach `dist/reddit-better-browsing-chrome.zip` and `dist/reddit-better-browsing-firefox.zip` to a GitHub release.
 
+## Instagram
+
+`instagram/` holds a second extension for instagram.com: browser video controls on every video, sound on by default at your volume, and a fast lightbox. `npm run build` builds it too (`dist/instagram-chrome`, `dist/instagram-firefox`). See [instagram/README.md](instagram/README.md).
+
 ## License
 
 [MIT](LICENSE). hls.js is bundled under its own license (`src/vendor/hls.LICENSE`).
