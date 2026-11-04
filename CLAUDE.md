@@ -1,11 +1,12 @@
 # CLAUDE.md
 
-Browser extension (Manifest V3) for new Reddit, one codebase for Chrome and Firefox. Plain JavaScript, no framework, no bundler, no runtime dependencies. README.md has the user-facing feature list and the file layout.
+Browser extension (Manifest V3) for new Reddit, one codebase for Chrome and Firefox. A second, smaller extension for Instagram lives in `instagram/` (see the section at the end). Plain JavaScript, no framework, no bundler, no runtime dependencies. README.md has the user-facing feature list and the file layout.
 
 ## Commands
 
-- `npm run build`: copies `src/` to `dist/chrome` and `dist/firefox`, writes each manifest from `manifest.base.json`, zips both.
+- `npm run build`: copies `src/` to `dist/chrome` and `dist/firefox`, writes each manifest from `manifest.base.json`, zips both. Also builds `instagram/src` into `dist/instagram-chrome`, `dist/instagram-firefox` and the userscript `dist/instagram-better-browsing.user.js`.
 - `npm test`: offline Playwright smoke test of `dist/chrome` (build first). Needs `npx playwright install chromium` once.
+- `npm run test:instagram`: the same for `dist/instagram-chrome` (`test/instagram-offline.mjs`).
 - Syntax check without a browser: `for f in src/*.js src/content/*.js src/popup/*.js; do node --check "$f"; done`
 
 ## Rules
@@ -42,3 +43,12 @@ Browser extension (Manifest V3) for new Reddit, one codebase for Chrome and Fire
 `test/offline.mjs` loads the built extension into Playwright's Chromium and answers every reddit.com request from fixtures: a small feed page, thread JSON with 61 comments and a "load more", and a video post. It checks the theme, quick bar, header gear, prefetch and cache behaviour, sanitizer output, load more, collapse, sort, `J`, `Esc`, video volume and live settings changes, and prints PASS/FAIL per check. When you add a feature, add a check here.
 
 What it can't cover: Reddit's real markup (feed web components, shadow DOM players, header layout) and Firefox. After changes to selectors in `main.js`, `theme.js`, `navgear.js` or `spoilers.js`, check by hand on www.reddit.com in both browsers.
+
+## Instagram extension (`instagram/`)
+
+Same rules and shape as the Reddit one, with its own `manifest.base.json` (own `version`), `src/` and global `IGB` instead of `RBE`. `build.js` lists both extensions; the Instagram one has no background script. `instagram/README.md` describes the features and how they work.
+
+- The userscript is assembled in `build.js` from the same files plus `instagram/userscript/`. A new content script must be added to both the manifest and that list.
+- Never send automated traffic to live Instagram from tests; extend the fixtures in `test/instagram-offline.mjs`.
+- Instagram's class names are generated and change often. Find things by structure, ARIA attributes and geometry (`article`, `a[href*="/p/"]`, `aria-current="step"`, `elementsFromPoint`), never by class name or by English `aria-label` text.
+- Feed videos sit inside an `<a href="/reels/…">` inside an `<article>`; grid previews are videos or images inside a link outside any `article`. `main-world.js`, `video.js` and `lightbox.js` all rely on that difference.
