@@ -34,9 +34,34 @@
   };
   const openItem = (d, i) => d.items[i]?.src && window.open(d.items[i].src, '_blank', 'noopener');
 
+  // ---------- link for Discord ----------
+  // Discord shows no preview for instagram.com links; an embed-fixer domain serves the same path with
+  // the tags Discord reads (InstaFix and its forks). The domain is a setting because they come and go.
+  const embedHost = () => (IGB.settings.embedHost || 'kkinstagram.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'kkinstagram.com';
+  IGB.embedUrl = (code, reel) => `https://${embedHost()}/${reel ? 'reel' : 'p'}/${code}/`;
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return; } catch {}
+    const ta = h('textarea', { style: { position: 'fixed', opacity: '0' } }, text);
+    document.body.append(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (!ok) throw new Error('clipboard blocked');
+  }
+  const embedButton = post => h('button', {
+    class: 'igb-tool igb-embed-btn', title: 'Copy link for Discord (shows the post or video in the chat)',
+    onclick: async e => {
+      e.preventDefault(); e.stopPropagation();
+      const code = post.code();
+      if (!code) return;
+      const url = IGB.embedUrl(code, post.reel);
+      try { await copyText(url); IGB.toast?.('Copied ' + url); }
+      catch (err) { IGB.toast?.('Could not copy: ' + url); }
+    }
+  }, '🔗');
+
   // Buttons for one post. getIdx() is read at click time (carousels move).
-  // ni: { code(), art() } for the "Not interested" button (notinterested.js), or null.
-  function buttons(getData, getIdx, multi, ni) {
+  // post: { code(), art(), reel } for the link and "Not interested" buttons, or null (stories).
+  function buttons(getData, getIdx, multi, post) {
     const s = IGB.settings;
     const run = fn => async e => {
       e.preventDefault(); e.stopPropagation();
@@ -49,13 +74,14 @@
       s.downloadTools ? h('button', { class: 'igb-tool', title: 'Download (Alt+S)', onclick: run((d, i) => IGB.downloadItems(d, [i])) }, '⤓') : '',
       s.downloadTools && multi ? h('button', { class: 'igb-tool', title: 'Download all in this post', onclick: run(d => IGB.downloadItems(d, d.items.map((_, i) => i))) }, '⤓ All') : '',
       s.downloadTools ? h('button', { class: 'igb-tool', title: 'Open in a new tab', onclick: run(openItem) }, '↗') : '',
-      s.notInterested && ni && IGB.notInterestedButton ? IGB.notInterestedButton(ni.code, ni.art) : ''
+      s.embedLink && post ? embedButton(post) : '',
+      s.notInterested && post && IGB.notInterestedButton ? IGB.notInterestedButton(post.code, post.art) : ''
     ].filter(Boolean);
   }
-  const anyTools = () => IGB.settings.downloadTools || IGB.settings.notInterested;
+  const anyTools = () => IGB.settings.downloadTools || IGB.settings.notInterested || IGB.settings.embedLink;
   // Lightbox: post data is already loaded
   IGB.mediaTools = (d, getIdx) => anyTools()
-    ? h('span', { class: 'igb-tools-inline' }, buttons(() => Promise.resolve(d), getIdx, d.items.length > 1, d.code ? { code: () => d.code } : null)) : '';
+    ? h('span', { class: 'igb-tools-inline' }, buttons(() => Promise.resolve(d), getIdx, d.items.length > 1, d.code ? { code: () => d.code, reel: d.items.length === 1 && d.items[0].type === 'video' } : null)) : '';
 
   // ---------- what's under the mouse ----------
   const onStory = () => location.pathname.startsWith('/stories/');
@@ -76,33 +102,51 @@
     const art = media.closest('article');
     if (art) {
       const code = IGB.articleCode(art);
-      return code && { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]'), ni: { code: () => code, art: () => art } };
+      return code && { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]'), post: { code: () => code, art: () => art, reel: !!art.querySelector('video') && !art.querySelector('[aria-current="step"]') } };
     }
     if (onStory()) return { key: 'story:' + (storyId() || ''), media, get: storyPost, idx: () => 0, multi: false };
     const code = IGB.codeOf(location.pathname);
     const scope = media.closest('[role="dialog"], main') || document.body;
     // Reels tab: the URL follows the reel on screen
-    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]'), ni: { code: () => IGB.codeOf(location.pathname) || code } };
+    const reel = /^\/reels?\//.test(location.pathname);
+    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]'), post: { code: () => IGB.codeOf(location.pathname) || code, reel } };
     return null;
   }
 
-  // One floating bar, moved over whichever media the mouse is on
+  // With the mouse on no post: the post (or reel, or story) in the middle of the window
+  function centerContext() {
+    const mid = innerHeight / 2;
+    const dist = r => (r.top <= mid && r.bottom >= mid ? 0 : Math.min(Math.abs(r.top - mid), Math.abs(r.bottom - mid)));
+    let best = null, bd = Infinity;
+    for (const m of document.querySelectorAll('img, video')) {
+      if (!isMedia(m) || m.closest('.igb-root')) continue;
+      const r = m.getBoundingClientRect();
+      if (r.bottom < 60 || r.top > innerHeight - 60 || r.right < 0 || r.left > innerWidth) continue;
+      const d = dist(r);
+      if (d < bd) { bd = d; best = r; }
+    }
+    if (!best) return null;
+    return contextAt(Math.min(Math.max(best.left + best.width / 2, 1), innerWidth - 1), Math.min(Math.max(mid, best.top + 5, 1), best.bottom - 5, innerHeight - 1));
+  }
+
+  // One floating bar beside the post under the mouse, or else the one in the middle of the window
   const GAP = 8;
   let bar = null, cur = null, mx = -1, my = -1, raf = 0;
   function place() {
     raf = 0;
     if (!anyTools() || document.documentElement.hasAttribute('data-igb-lb')) return hide();
     if (bar && bar.contains(document.elementFromPoint(mx, my))) return;
-    let c = contextAt(mx, my);
+    let c = mx >= 0 ? contextAt(mx, my) : null;
     // The bar sits just outside the media's right edge: keep it while the mouse crosses the gap
     if (!c && cur?.media.isConnected) {
       const r = cur.media.getBoundingClientRect();
       if (mx >= r.left && mx <= r.right + GAP + 40 && my >= r.top && my <= r.bottom) c = cur;
     }
+    if (!c) c = centerContext();
     if (!c) return hide();
     if (!bar) { bar = h('div', { class: 'igb-root igb-tools' }); document.body.append(bar); }
     if (!cur || cur.key !== c.key || cur.media !== c.media) {
-      bar.replaceChildren(...buttons(c.get, c.idx, c.multi, c.ni));
+      bar.replaceChildren(...buttons(c.get, c.idx, c.multi, c.post));
       if (IGB.settings.downloadTools) c.get().catch(() => {}); // warm the data so the click is instant
     }
     cur = c;
@@ -116,7 +160,12 @@
   }
   function hide() { if (bar) bar.hidden = true; cur = null; }
   addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; if (!raf) raf = requestAnimationFrame(place); }, { passive: true });
-  addEventListener('scroll', () => { if (!raf && mx >= 0) raf = requestAnimationFrame(place); }, { passive: true, capture: true });
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
+  addEventListener('scroll', schedule, { passive: true, capture: true });
+  addEventListener('resize', schedule, { passive: true });
+  addEventListener('mouseleave', () => { mx = my = -1; schedule(); });
+  IGB.onDomChange(schedule, 300);
+  IGB.onSettings(() => { cur = null; schedule(); });
 
   // Alt+S: download what's current (lightbox item, story, or the media under the mouse)
   addEventListener('keydown', e => {

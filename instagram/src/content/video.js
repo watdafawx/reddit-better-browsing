@@ -40,7 +40,10 @@
         const r = or.width * or.height ? or : er;
         // must stay within the video's box (with slack), so we never hide captions or action bars
         if (r.top < vr.top - 8 || r.bottom > vr.bottom + 8 || r.left < vr.left - 8 || r.right > vr.right + 8) continue;
-        o.classList.add('igb-ov');
+        // Text or links laid over the video (the Reels caption with the user, Follow, hashtags) stay
+        // visible and clickable; only the empty parts of that layer let clicks through to the controls.
+        if (o.classList.contains('igb-cap') || o.querySelector('a[href], button') || o.textContent.trim()) o.classList.add('igb-cap');
+        else o.classList.add('igb-ov');
       }
     }
   }
@@ -131,6 +134,30 @@
     if (document.documentElement.hasAttribute('data-igb-lb')) return;
     IGB.nextReel(v);
   }, true);
+
+  // On/off button for auto-scroll, bottom right of the Reels tab
+  let asBtn = null;
+  function syncButton() {
+    if (!document.body) return;
+    if (!onReels() || document.documentElement.hasAttribute('data-igb-lb')) { if (asBtn) asBtn.hidden = true; return; }
+    if (!asBtn) {
+      asBtn = IGB.h('button', { class: 'igb-root igb-as', type: 'button',
+        onclick: () => IGB.saveSetting('reelsAutoScroll', !IGB.settings.reelsAutoScroll) });
+      document.body.append(asBtn);
+    }
+    const on = !!IGB.settings.reelsAutoScroll;
+    asBtn.hidden = false;
+    asBtn.classList.toggle('on', on);
+    asBtn.setAttribute('aria-pressed', String(on));
+    asBtn.title = on ? 'Auto-scroll on: the next reel starts when this one ends' : 'Auto-scroll off: reels loop';
+    asBtn.textContent = on ? 'Auto-scroll: On' : 'Auto-scroll: Off';
+  }
+  IGB.onSettings(() => {
+    syncButton();
+    if (autoScroll()) visible.forEach(v => { if (!ours(v) && !isTile(v)) v.loop = false; });
+  });
+  IGB.onDomChange(syncButton, 400);
+  addEventListener('popstate', () => setTimeout(syncButton, 50));
 
   // For videos we create ourselves (lightbox)
   IGB.setupOwnVideo = function (v) {

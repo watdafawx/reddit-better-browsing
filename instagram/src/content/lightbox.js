@@ -168,7 +168,9 @@
       h('div', { class: 'igb-lb-head' },
         d?.user ? h('a', { class: 'igb-lb-user', href: `/${d.user}/` }, d.user) : h('span', { class: 'igb-lb-user' }, '…'),
         d?.taken ? h('span', { class: 'igb-lb-when' }, new Date(d.taken * 1000).toLocaleDateString()) : ''),
-      d && s.lightboxCaption && d.caption ? h('div', { class: 'igb-lb-cap' }, d.caption) : h('div', { class: 'igb-lb-cap' }),
+      d && s.lightboxCaption && d.caption
+        ? h('div', { class: 'igb-lb-cap' }, s.captionLinks && IGB.linkify ? IGB.linkify(d.caption) : d.caption)
+        : h('div', { class: 'igb-lb-cap' }),
       h('div', { class: 'igb-lb-meta' },
         d?.likes != null ? h('span', null, '♥ ' + d.likes.toLocaleString()) : '',
         d?.comments != null ? h('span', null, d.comments.toLocaleString() + ' comments') : '',

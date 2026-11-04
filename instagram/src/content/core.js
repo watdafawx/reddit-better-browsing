@@ -57,6 +57,12 @@
     if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + path);
     return r.json();
   };
+  // Change one setting: read-modify-write so keys changed elsewhere are kept
+  IGB.saveSetting = async (key, value) => {
+    const cur = (await IGB.api.storage.sync.get('settings')).settings || {};
+    cur[key] = value;
+    await IGB.api.storage.sync.set({ settings: cur });
+  };
   // Form POST the way Instagram's web app sends them: CSRF token from the cookie, plus the
   // www-claim header Instagram keeps in sessionStorage.
   IGB.postForm = async function (path, data) {
