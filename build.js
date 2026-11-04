@@ -105,8 +105,11 @@ const PANEL_CSS = ${JSON.stringify(igPanel.css)};
 ${join([...igMain, ...withShim(igContent, 'instagram/userscript/shim.js'), 'instagram/src/popup/popup.js', 'instagram/userscript/panel.js'])}
 ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
 
-  // Version goes up whenever either extension's does (Tampermonkey compares it part by part)
-  const version = `${rMan.version}.${igMan.version}`;
+  // Version goes up whenever either extension's does (Tampermonkey compares it part by part). The last
+  // part, userscriptRevision in package.json, is for changes to the script alone (header, icon):
+  // bump it for those, set it back to 0 when either extension's version changes.
+  const rev = JSON.parse(read('package.json')).userscriptRevision || 0;
+  const version = `${rMan.version}.${igMan.version}.${rev}`;
   const header = `// ==UserScript==
 // @name         Better Browsing (Reddit + Instagram)
 // @namespace    better-browsing-watdafawx
@@ -121,6 +124,7 @@ ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
 // @noframes
 // @updateURL    ${UPDATE_URL}
 // @downloadURL  ${UPDATE_URL}
+// @icon         ${'data:image/svg+xml;base64,' + fs.readFileSync('userscript/icon.svg').toString('base64')}
 // @homepageURL  https://github.com/watdafawx/reddit-better-browsing
 // @license      MIT
 // ==/UserScript==
