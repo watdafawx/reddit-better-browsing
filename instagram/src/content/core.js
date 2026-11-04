@@ -47,6 +47,22 @@
     return el;
   };
 
+  // Line icons in the style of Instagram's own (24px, 2px stroke, currentColor)
+  const ICONS = {
+    download: '<path d="M12 3.5v11m0 0-4.5-4.5m4.5 4.5 4.5-4.5"/><path d="M4 16.5v2A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5v-2"/>',
+    downloadAll: '<rect x="7.5" y="2.5" width="14" height="14" rx="2.5"/><path d="M3 7v11.5A2.5 2.5 0 0 0 5.5 21H17"/><path d="M14.5 6v6.5m0 0-3-3m3 3 3-3"/>',
+    open: '<path d="M14 3h7v7m0-7-9 9"/><path d="M19 14v4.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5H10"/>',
+    link: '<path d="M10.5 13.5a4.6 4.6 0 0 0 6.5 0l3-3a4.6 4.6 0 0 0-6.5-6.5L12 5.5"/><path d="M13.5 10.5a4.6 4.6 0 0 0-6.5 0l-3 3a4.6 4.6 0 0 0 6.5 6.5l1.5-1.5"/>',
+    notInterested: '<circle cx="12" cy="12" r="9.5"/><path d="m5.3 5.3 13.4 13.4"/>',
+    autoScroll: '<rect x="5.5" y="2" width="13" height="14" rx="2.5"/><path d="m8 18.5 4 3 4-3"/>'
+  };
+  IGB.icon = name => {
+    const s = document.createElement('span');
+    s.className = 'igb-ico';
+    s.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+    return s;
+  };
+
   // Firefox: page-context fetch so cookies behave like Instagram's own requests.
   const pageFetch = (typeof content !== 'undefined' && content && content.fetch) ? content.fetch.bind(content) : fetch.bind(globalThis);
   IGB.getJSON = async function (path) {

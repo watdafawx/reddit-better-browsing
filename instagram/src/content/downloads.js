@@ -48,7 +48,7 @@
     if (!ok) throw new Error('clipboard blocked');
   }
   const embedButton = post => h('button', {
-    class: 'igb-tool igb-embed-btn', title: 'Copy link for Discord (shows the post or video in the chat)',
+    class: 'igb-tool igb-embed-btn', title: 'Copy link for Discord (shows the post or video in the chat)', 'aria-label': 'Copy link for Discord',
     onclick: async e => {
       e.preventDefault(); e.stopPropagation();
       const code = post.code();
@@ -57,7 +57,7 @@
       try { await copyText(url); IGB.toast?.('Copied ' + url); }
       catch (err) { IGB.toast?.('Could not copy: ' + url); }
     }
-  }, '🔗');
+  }, IGB.icon('link'));
 
   // Buttons for one post. getIdx() is read at click time (carousels move).
   // post: { code(), art(), reel } for the link and "Not interested" buttons, or null (stories).
@@ -70,12 +70,14 @@
       catch (err) { console.warn('[IGB]', err); }
       finally { b.classList.remove('busy'); }
     };
+    const tool = (cls, label, icon, onclick) => h('button', { class: 'igb-tool ' + cls, type: 'button', title: label, 'aria-label': label, onclick }, IGB.icon(icon));
     return [
-      s.downloadTools ? h('button', { class: 'igb-tool', title: 'Download (Alt+S)', onclick: run((d, i) => IGB.downloadItems(d, [i])) }, '⤓') : '',
-      s.downloadTools && multi ? h('button', { class: 'igb-tool', title: 'Download all in this post', onclick: run(d => IGB.downloadItems(d, d.items.map((_, i) => i))) }, '⤓ All') : '',
-      s.downloadTools ? h('button', { class: 'igb-tool', title: 'Open in a new tab', onclick: run(openItem) }, '↗') : '',
+      s.downloadTools ? tool('igb-dl', 'Download (Alt+S)', 'download', run((d, i) => IGB.downloadItems(d, [i]))) : '',
+      s.downloadTools && multi ? tool('igb-dl-all', 'Download all in this post', 'downloadAll', run(d => IGB.downloadItems(d, d.items.map((_, i) => i)))) : '',
+      s.downloadTools ? tool('igb-open', 'Open in a new tab', 'open', run(openItem)) : '',
       s.embedLink && post ? embedButton(post) : '',
-      s.notInterested && post && IGB.notInterestedButton ? IGB.notInterestedButton(post.code, post.art) : ''
+      s.notInterested && post && IGB.notInterestedButton ? IGB.notInterestedButton(post.code, post.art) : '',
+      post?.reelsTab && IGB.autoScrollButton ? IGB.autoScrollButton() : ''
     ].filter(Boolean);
   }
   const anyTools = () => IGB.settings.downloadTools || IGB.settings.notInterested || IGB.settings.embedLink;
@@ -109,7 +111,7 @@
     const scope = media.closest('[role="dialog"], main') || document.body;
     // Reels tab: the URL follows the reel on screen
     const reel = /^\/reels?\//.test(location.pathname);
-    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]'), post: { code: () => IGB.codeOf(location.pathname) || code, reel } };
+    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]'), post: { code: () => IGB.codeOf(location.pathname) || code, reel, reelsTab: location.pathname.startsWith('/reels/') } };
     return null;
   }
 
@@ -131,29 +133,37 @@
 
   // One floating bar beside the post under the mouse, or else the one in the middle of the window
   const GAP = 8;
-  let bar = null, cur = null, mx = -1, my = -1, raf = 0;
+  let bar = null, cur = null, mx = -1, my = -1, raf = 0, dirty = false;
   function place() {
     raf = 0;
     if (!anyTools() || document.documentElement.hasAttribute('data-igb-lb')) return hide();
-    if (bar && bar.contains(document.elementFromPoint(mx, my))) return;
+    // Mouse on the column: leave it where it is, but redraw it after a settings change (the
+    // auto-scroll switch) and drop it after a page change
+    if (bar && cur && cur.path === location.pathname && bar.contains(document.elementFromPoint(mx, my))) {
+      if (dirty) { dirty = false; bar.replaceChildren(...buttons(cur.get, cur.idx, cur.multi, cur.post)); }
+      return;
+    }
     let c = mx >= 0 ? contextAt(mx, my) : null;
     // The bar sits just outside the media's right edge: keep it while the mouse crosses the gap
-    if (!c && cur?.media.isConnected) {
+    if (!c && cur?.media.isConnected && cur.path === location.pathname) {
       const r = cur.media.getBoundingClientRect();
       if (mx >= r.left && mx <= r.right + GAP + 40 && my >= r.top && my <= r.bottom) c = cur;
     }
     if (!c) c = centerContext();
     if (!c) return hide();
     if (!bar) { bar = h('div', { class: 'igb-root igb-tools' }); document.body.append(bar); }
-    if (!cur || cur.key !== c.key || cur.media !== c.media) {
+    if (dirty || !cur || cur.key !== c.key || cur.media !== c.media || cur.path !== location.pathname) {
+      dirty = false;
       bar.replaceChildren(...buttons(c.get, c.idx, c.multi, c.post));
       if (IGB.settings.downloadTools) c.get().catch(() => {}); // warm the data so the click is instant
     }
     cur = c;
+    c.path = location.pathname;
     // A column beside the media's top-right corner, off the picture; inside the edge only if
     // there's no room on the right (media running to the window edge).
     const r = c.media.getBoundingClientRect();
     bar.hidden = false;
+    bar.classList.toggle('igb-on-dark', onStory());
     const w = bar.offsetWidth || 36;
     const x = r.right + GAP + w <= innerWidth ? r.right + GAP : r.right - w - GAP;
     bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(r.top, 0) + GAP)}px)`;
@@ -165,7 +175,7 @@
   addEventListener('resize', schedule, { passive: true });
   addEventListener('mouseleave', () => { mx = my = -1; schedule(); });
   IGB.onDomChange(schedule, 300);
-  IGB.onSettings(() => { cur = null; schedule(); });
+  IGB.onSettings(() => { dirty = true; schedule(); });
 
   // Alt+S: download what's current (lightbox item, story, or the media under the mouse)
   addEventListener('keydown', e => {

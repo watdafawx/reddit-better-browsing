@@ -109,7 +109,27 @@
   });
 
   // React sets `muted` as a property on mount, before play(); re-apply our level when playback starts.
-  document.addEventListener('playing', e => { const v = e.target; if (active(v) && !waiting.has(v)) applyAudio(v); }, true);
+  // A video still waiting for a click is fine to unmute once the page has had one.
+  const activated = () => !!navigator.userActivation?.hasBeenActive;
+  document.addEventListener('playing', e => {
+    const v = e.target;
+    if (!active(v)) return;
+    if (waiting.has(v) && activated()) waiting.delete(v);
+    if (!waiting.has(v)) applyAudio(v);
+  }, true);
+
+  // Safety net (Reels kept coming up muted): a playing video that is muted though the user never
+  // muted it gets our level back. Only after the page has had a click or key press: unmuting
+  // before that makes the browser pause the video.
+  setInterval(() => {
+    if (cfg.mode !== 'volume' || !cfg.volume || document.hidden || !activated()) return;
+    for (const v of document.querySelectorAll('video')) {
+      if (v.paused || !v.muted || v.dataset.igbUserAudio || !active(v)) continue;
+      waiting.delete(v);
+      setVol(v, cfg.volume / 100);
+      setMuted(v, false);
+    }
+  }, 600);
   // The browser's own controls change volume/mute without going through the setters above.
   // A change on this player that differs from our level is the user's: keep it from then on.
   document.addEventListener('volumechange', e => {
