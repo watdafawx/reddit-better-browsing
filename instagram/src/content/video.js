@@ -6,6 +6,9 @@
   const isTile = v => !!v.closest('a[href]') && !v.closest('article, [role="dialog"]');
   const isStory = () => location.pathname.startsWith('/stories/'); // taps on the overlay = next/prev story
   const ours = v => !!v.closest('.igb-root');
+  const onReels = () => location.pathname.startsWith('/reels/');
+  // Reels tab with auto-scroll on: no looping, so the video ends and we move on
+  const autoScroll = () => IGB.settings.reelsAutoScroll && onReels();
   const visible = new Set();   // videos currently on screen; only those need work
 
   IGB.onSettings(s => {
@@ -48,7 +51,7 @@
     const on = s.nativeControls && !isStory();
     if (on) {
       if (!v.controls) v.controls = true;
-      v.loop = !!s.videoLoop;
+      v.loop = !!s.videoLoop && !autoScroll();
       v.dataset.igbNative = '1';
       unlink(v);
       markOverlay(v);
@@ -95,6 +98,39 @@
   // Instagram re-renders overlays on hover/pause without adding videos; re-check what's on screen.
   setInterval(() => { if (!document.hidden) visible.forEach(prep); }, 1500);
   addEventListener('scroll', () => { clearTimeout(scan.t); scan.t = setTimeout(() => visible.forEach(prep), 150); }, { passive: true, capture: true });
+
+  // ---------- Reels tab auto-scroll ----------
+  // The Reels tab is one scroll-snap column, a reel per screen. When the reel on screen ends,
+  // scroll to the next one, like the phone app's auto-scroll.
+  const pageVideos = () => [...document.querySelectorAll('video')].filter(v => !ours(v) && !isTile(v));
+  const onScreen = v => { const r = v.getBoundingClientRect(); return r.height > 80 && r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4; };
+  function scroller(el) {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (/(auto|scroll)/.test(getComputedStyle(p).overflowY) && p.scrollHeight > p.clientHeight) return p;
+    }
+    return document.scrollingElement;
+  }
+  IGB.nextReel = function (from) {
+    const vids = pageVideos();
+    from = from || vids.find(onScreen);
+    if (!from) return false;
+    const top = from.getBoundingClientRect().top;
+    const next = vids.map(v => [v, v.getBoundingClientRect().top]).filter(([, t]) => t > top + 40).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (next) next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    else scroller(from).scrollBy({ top: from.getBoundingClientRect().height, behavior: 'smooth' }); // next one not rendered yet
+    return true;
+  };
+  // Instagram may set loop itself; keep it off while auto-scroll is on
+  document.addEventListener('playing', e => {
+    const v = e.target;
+    if (v instanceof HTMLVideoElement && autoScroll() && !ours(v) && !isTile(v)) v.loop = false;
+  }, true);
+  document.addEventListener('ended', e => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement) || !autoScroll() || ours(v) || isTile(v) || !onScreen(v)) return;
+    if (document.documentElement.hasAttribute('data-igb-lb')) return;
+    IGB.nextReel(v);
+  }, true);
 
   // For videos we create ourselves (lightbox)
   IGB.setupOwnVideo = function (v) {
