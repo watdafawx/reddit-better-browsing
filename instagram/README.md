@@ -11,7 +11,8 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
   - opens at once with the thumbnail already on the page, then swaps in the full-resolution image or the full MP4 (with audio, browser controls, your volume);
   - wheel or <kbd>←</kbd>/<kbd>→</kbd> go through a carousel's slides and on into the next posts; <kbd>↑</kbd>/<kbd>↓</kbd> jump by post;
   - the next two posts are fetched ahead, so stepping is instant;
-  - click a photo to see it at full size, click the caption to expand it;
+  - user, date, the full caption, likes, comment count and download buttons sit in a panel beside the media (under it on windows narrower than 900px);
+  - click a photo to see it at full size;
   - <kbd>Esc</kbd>, the browser Back button, or a click beside the media closes it. Ctrl/⌘/middle-click on a grid tile still opens Instagram's own page.
 - Feed photos open in the lightbox on a single click; a double click still likes the post.
 - Stories keep Instagram's own controls (tapping there means next/previous story).

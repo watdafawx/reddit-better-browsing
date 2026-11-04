@@ -8,11 +8,12 @@ html.igb-native .igb-ov { opacity: 0 !important; }
 .igb-lb {
   position: fixed; inset: 0; z-index: 2147483000;
   background: rgba(0, 0, 0, .96);
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: row;
   color: #f2f2f2; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none; -webkit-user-select: none;
 }
 .igb-lb * { box-sizing: border-box; }
+.igb-lb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .igb-lb-stage {
   flex: 1; min-height: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
@@ -49,26 +50,37 @@ html.igb-native .igb-ov { opacity: 0 !important; }
 }
 .igb-lb-close:hover { background: rgba(255,255,255,.25); }
 
-.igb-lb-dots { display: flex; gap: 5px; justify-content: center; padding: 8px 0 0; min-height: 14px; }
+.igb-lb-dots { display: flex; gap: 5px; justify-content: center; padding: 10px 0 12px; min-height: 28px; }
 .igb-lb-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3); }
 .igb-lb-dots i.on { background: #fff; }
 
 .igb-lb-bar {
-  display: flex; gap: 14px; align-items: flex-start;
-  padding: 8px 18px 12px; max-height: 26vh; overflow: auto;
+  width: 360px; flex: none; display: flex; flex-direction: column; gap: 14px;
+  padding: 20px 20px 16px; border-left: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .03);
 }
-.igb-lb-user { font-weight: 600; color: #fff; text-decoration: none; white-space: nowrap; }
+.igb-lb-head { display: flex; align-items: baseline; gap: 10px; padding-right: 40px; }
+.igb-lb-user { font-weight: 600; font-size: 15px; color: #fff; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .igb-lb-user:hover { text-decoration: underline; }
-.igb-lb-cap { flex: 1; min-width: 0; color: #ddd; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
-.igb-lb-cap.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
-.igb-lb-meta { white-space: nowrap; color: #999; display: flex; gap: 12px; }
+.igb-lb-when { color: #8e8e93; font-size: 12px; }
+.igb-lb-cap {
+  flex: 1; min-height: 0; overflow: auto; color: #ddd;
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text;
+}
+.igb-lb-meta { color: #999; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
 .igb-lb-meta a { color: #8ab4ff; text-decoration: none; }
 .igb-lb-meta a:hover { text-decoration: underline; }
+.igb-lb-actions { display: flex; }
+
+/* Narrow windows: the panel goes under the media */
+@media (max-width: 900px) {
+  .igb-lb { flex-direction: column; }
+  .igb-lb-bar { width: auto; max-height: 30vh; border-left: 0; border-top: 1px solid rgba(255, 255, 255, .1); gap: 8px; padding: 12px 16px; }
+}
 
 @media (max-width: 700px) {
   .igb-lb-stage { padding: 52px 8px 0; }
   .igb-lb-nav { display: none; }
-  .igb-lb-bar { flex-wrap: wrap; }
 }
 
 /* ---------- download / open buttons ---------- */

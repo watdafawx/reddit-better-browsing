@@ -172,6 +172,8 @@ await page.waitForSelector('.igb-lb .igb-lb-dots i', { timeout: 5000 });
 const lbGrid = await page.evaluate(() => ({ url: location.pathname, nav: window.__igNav, meta: document.querySelector('.igb-lb-meta')?.textContent, cap: document.querySelector('.igb-lb-cap')?.textContent }));
 check('grid tile opens lightbox, not Instagram', lbGrid.url === '/explore/' && lbGrid.nav === 0 && /1 \/ 3/.test(lbGrid.meta), lbGrid);
 check('caption shown', lbGrid.cap === 'Carousel caption', lbGrid.cap);
+const side = await page.evaluate(() => { const b = document.querySelector('.igb-lb-bar').getBoundingClientRect(), m = document.querySelector('.igb-lb-stage').getBoundingClientRect(); return { barLeft: Math.round(b.left), stageRight: Math.round(m.right), barTop: Math.round(b.top), barH: Math.round(b.height) }; });
+check('caption panel beside the media', side.barLeft >= side.stageRight && side.barTop === 0 && side.barH === 900, side);
 
 await page.keyboard.press('ArrowRight');
 const slide2 = await page.evaluate(() => [...document.querySelectorAll('.igb-lb-dots i')].findIndex(i => i.classList.contains('on')));
