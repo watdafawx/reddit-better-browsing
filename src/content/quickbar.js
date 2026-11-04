@@ -66,7 +66,7 @@
         h('button', { class: 'rbe-qb-btn', title: NSFW_LABEL[s.nsfwMode] + ' (Alt+N to cycle)', onclick: RBE.cycleNsfw }, nsfwIcon),
         h('button', { class: 'rbe-qb-btn', title: 'Video: ' + videoLabel(s) + ' (Alt+V)', onclick: RBE.cycleVideo }, vidIcon),
         h('button', { class: 'rbe-qb-btn' + (s.revealSpoilers ? ' on' : ''), title: (s.revealSpoilers ? 'Spoilers auto-revealed' : 'Spoilers hidden') + ' (Alt+S)', onclick: RBE.toggleSpoilers }, s.revealSpoilers ? '🔓' : '🔒'),
-        h('button', { class: 'rbe-qb-btn', title: 'Accounts', onclick: e => accountMenu(e.currentTarget) }, '👤'),
+        RBE.userscript ? null : h('button', { class: 'rbe-qb-btn', title: 'Accounts', onclick: e => accountMenu(e.currentTarget) }, '👤'),
         h('button', { class: 'rbe-qb-btn', title: 'Settings', onclick: () => RBE.openSettingsPanel?.() }, '⚙️')
       ]].flat().filter(Boolean));
   }

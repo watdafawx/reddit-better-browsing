@@ -1,7 +1,7 @@
 // Offline smoke test: loads dist/chrome into Chromium and answers every reddit.com request from
 // fixtures below, so it never touches live Reddit. Run: npm test (after npm run build).
 import { chromium } from 'playwright';
-import os from 'os'; import path from 'path'; import fs from 'fs';
+import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
 
 const ext = path.resolve(process.argv[2] || 'dist/chrome');
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'rbe-'));
@@ -34,7 +34,7 @@ ${['aaa', 'bbb', 'vvv', 'ccc'].map(id => `<article><shreddit-post id="t3_${id}" 
 <div style="height:2000px"></div></body></html>`;
 
 const reqs = [];
-await ctx.route(/reddit\.com|redd\.it|redditstatic/, async route => {
+const fixtures = async route => {
   const u = new URL(route.request().url());
   reqs.push({ t: Date.now(), u: u.pathname + u.search });
   const json = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
@@ -48,7 +48,8 @@ await ctx.route(/reddit\.com|redd\.it|redditstatic/, async route => {
   if (u.pathname.endsWith('.mp4')) return route.fulfill({ status: 404, body: '' });
   if (u.pathname.startsWith('/r/test')) return route.fulfill({ status: 200, contentType: 'text/html', body: feed });
   return route.fulfill({ status: 404, body: '' });
-});
+};
+await ctx.route(/reddit\.com|redd\.it|redditstatic/, fixtures);
 
 const logs = [];
 const page = await ctx.newPage();
@@ -159,9 +160,67 @@ await page.waitForTimeout(300);
 await page.reload();
 r.themedAtDomStart = await page.evaluate(() => document.documentElement.classList.contains('rbe-themed'));
 
+// extension popup still mounts the settings form (popup.js is shared with the userscript panel)
+const idSrc = process.platform === 'win32' ? Buffer.from(ext, 'utf16le') : Buffer.from(ext);
+const extId = [...crypto.createHash('sha256').update(idSrc).digest('hex').slice(0, 32)].map(c => String.fromCharCode(97 + parseInt(c, 16))).join('');
+const pop = await ctx.newPage();
+await pop.goto(`chrome-extension://${extId}/popup/popup.html`).catch(() => {});
+await pop.waitForTimeout(600);
+r.popup = await pop.evaluate(() => ({ themes: document.querySelectorAll('#themes .theme').length, accounts: !!document.querySelector('[data-tab="accounts"]'), checked: [...document.querySelectorAll('input[type=checkbox][data-key]')].some(i => i.checked) })).catch(e => ({ err: e.message }));
+
 r.logs = logs;
 await ctx.close();
 fs.rmSync(prof, { recursive: true, force: true });
+
+// ---------- the combined userscript (dist/better-browsing.user.js), no extension ----------
+const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
+r.us = { built: fs.existsSync(usFile) };
+if (r.us.built) {
+  const b2 = await chromium.launch();
+  const c2 = await b2.newContext({ viewport: { width: 1400, height: 900 } });
+  await c2.route(/reddit\.com|redd\.it|redditstatic/, fixtures);
+  await c2.addInitScript({ path: usFile });
+  const p2 = await c2.newPage();
+  const usLogs = [];
+  p2.on('pageerror', e => usLogs.push(e.message));
+  p2.on('dialog', d => { usLogs.push('dialog ' + d.message()); d.dismiss(); });
+  await p2.goto('https://www.reddit.com/r/test/');
+  await p2.waitForTimeout(1500);
+  Object.assign(r.us, await p2.evaluate(() => ({
+    theme: !!document.getElementById('rbe-theme'), css: !!document.getElementById('rbe-css'),
+    quickbar: !!document.getElementById('rbe-qb'), gear: !!document.querySelector('.rbe-nav-gear'),
+    accountsBtn: !!document.querySelector('#rbe-qb [title="Accounts"]'), hlsBefore: !!window.Hls,
+    videoAttr: document.documentElement.dataset.rbeVideo || ''
+  })));
+  const pb = await p2.locator('shreddit-post#t3_aaa').boundingBox();
+  await p2.mouse.click(pb.x + 200, pb.y + 100);
+  await p2.waitForSelector('.rbe-viewer .rbe-c', { timeout: 8000 }).catch(() => {});
+  r.us.comments = await p2.evaluate(() => document.querySelectorAll('.rbe-viewer .rbe-c').length);
+  await p2.keyboard.press('Escape');
+  await p2.waitForTimeout(300);
+  const vb = await p2.locator('shreddit-post#t3_vvv').boundingBox();
+  await p2.mouse.click(vb.x + 200, vb.y + 100);
+  await p2.waitForSelector('.rbe-viewer video', { timeout: 8000 }).catch(() => {});
+  await p2.waitForTimeout(2000);
+  Object.assign(r.us, await p2.evaluate(() => { const v = document.querySelector('.rbe-viewer video'); return { hlsAfter: typeof window.Hls === 'function', vol: v?.volume }; }));
+  await p2.keyboard.press('Escape');
+  await p2.waitForTimeout(300);
+  await p2.click('.rbe-nav-gear').catch(() => {});
+  await p2.waitForTimeout(500);
+  Object.assign(r.us, await p2.evaluate(() => {
+    const root = document.querySelector('.rbe-us-settings')?.shadowRoot;
+    return { panelInputs: root?.querySelectorAll('[data-key]').length || 0, panelAccounts: !!root?.querySelector('[data-tab="accounts"]'), themes: root?.querySelectorAll('#themes .theme').length || 0 };
+  }));
+  await p2.evaluate(() => [...document.querySelector('.rbe-us-settings').shadowRoot.querySelectorAll('#themes .theme')].find(b => b.textContent === 'nord')?.click());
+  await p2.waitForTimeout(800);
+  r.us.saved = await p2.evaluate(() => JSON.parse(localStorage.getItem('rbe-userscript-storage') || '{}')?.sync?.settings?.theme);
+  r.us.applied = await p2.evaluate(() => document.documentElement.classList.contains('rbe-themed'));
+  await p2.keyboard.press('Escape');
+  await p2.waitForTimeout(200);
+  r.us.panelClosed = await p2.evaluate(() => !document.querySelector('.rbe-us-settings'));
+  r.us.errors = usLogs;
+  await b2.close();
+}
 
 const checks = {
   'theme style injected': r.themeStyle,
@@ -185,7 +244,15 @@ const checks = {
   'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,
   'no page errors or dialogs': !logs.some(l => /pageerror|DIALOG/.test(l)),
+  'extension popup mounts settings form': r.popup.themes > 3 && r.popup.accounts && r.popup.checked,
+  'userscript: theme, quick bar, gear; no accounts button': r.us.built && r.us.theme && r.us.css && r.us.quickbar && r.us.gear && !r.us.accountsBtn && /"mode":"volume"/.test(r.us.videoAttr),
+  'userscript: viewer and comments': r.us.comments === 61,
+  'userscript: hls.js loads on first video, volume applied': r.us.hlsBefore === false && r.us.hlsAfter === true && r.us.vol === 0.1,
+  'userscript: gear opens settings panel (no accounts tab)': r.us.panelInputs > 20 && !r.us.panelAccounts && r.us.themes > 3,
+  'userscript: settings change saved and applied live': r.us.saved === 'nord' && r.us.applied,
+  'userscript: Esc closes panel, no page errors': r.us.panelClosed && r.us.errors?.length === 0,
 };
 let failed = 0;
 for (const [name, ok] of Object.entries(checks)) { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failed++; }
+if (failed) console.log('userscript details:', JSON.stringify(r.us));
 if (failed) { console.log(JSON.stringify(r, null, 2)); process.exit(1); }

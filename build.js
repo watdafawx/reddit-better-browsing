@@ -1,4 +1,4 @@
-// node build.js  ->  dist/chrome, dist/firefox (Reddit), dist/instagram-chrome, dist/instagram-firefox,
+// node build.js  ->  dist/chrome, dist/firefox (Reddit), dist/instagram-chrome, dist/instagram-firefox, dist/better-browsing.user.js,
 // and a zip of each (no dependencies, Node 22+)
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 
@@ -52,43 +52,87 @@ for (const e of extensions) {
   }
 }
 
-// Instagram as a single userscript (Tampermonkey / Violentmonkey). It must run in the page itself
-// (@grant none) at document-start, so the audio patch is in place before Instagram's player loads.
+// One userscript for both sites (Tampermonkey / Violentmonkey): dist/better-browsing.user.js.
+// It runs in the page itself (@grant none) at document-start, so the audio patches are in place
+// before Reddit's and Instagram's players load. Each site's part is its content scripts in manifest
+// order, with a shim for the extension APIs right after defaults.js, and its popup form in a panel.
+// Tampermonkey checks UPDATE_URL for a higher @version (see "Releasing the userscript" in CLAUDE.md).
+const UPDATE_URL = 'https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js';
 {
-  const ig = 'instagram/src', man = JSON.parse(fs.readFileSync('instagram/manifest.base.json', 'utf8'));
   const read = f => fs.readFileSync(f, 'utf8');
-  const icon = 'data:image/png;base64,' + fs.readFileSync(`${ig}/icons/icon48.png`).toString('base64');
-  const popup = read(`${ig}/popup/popup.html`);
-  const panelHtml = popup.slice(popup.indexOf('<header>'), popup.indexOf('</main>') + 7).replace('../icons/icon48.png', icon);
-  const panelCss = read(`${ig}/popup/popup.css`).replace(/:root/g, ':host').replace(/^body \{/m, '.panel > div {');
-  const parts = [
-    `${ig}/main-world.js`, `${ig}/content/defaults.js`, 'instagram/userscript/shim.js', `${ig}/content/core.js`,
-    `${ig}/content/video.js`, `${ig}/content/lightbox.js`, `${ig}/content/notinterested.js`, `${ig}/content/captions.js`, `${ig}/content/downloads.js`, `${ig}/content/settings.js`, `${ig}/popup/popup.js`
-  ];
+  const rMan = JSON.parse(read('manifest.base.json')), igMan = JSON.parse(read('instagram/manifest.base.json'));
+  // [main-world files, content files] from a manifest, as paths under srcDir
+  const scripts = (man, srcDir) => {
+    const cs = man.content_scripts;
+    return [cs.filter(c => c.world === 'MAIN').flatMap(c => c.js), cs.filter(c => c.world !== 'MAIN').flatMap(c => c.js)]
+      .map(list => [...new Set(list)].map(f => `${srcDir}/${f}`));
+  };
+  const cssFiles = (man, srcDir) => [...new Set(man.content_scripts.flatMap(c => c.css || []))].map(f => `${srcDir}/${f}`);
+  const withShim = (list, shim) => { const i = list.findIndex(f => f.endsWith('/defaults.js')); return [...list.slice(0, i + 1), shim, ...list.slice(i + 1)]; };
+  const join = files => files.map(f => `// ---- ${f} ----\n${read(f)}`).join('\n\n');
+  const style = (id, files) => `(() => { const s = document.createElement('style'); s.id = '${id}'; s.textContent = ${JSON.stringify(files.map(read).join('\n'))}; (document.head || document.documentElement).append(s); })();`;
+  const panel = srcDir => {
+    const icon = 'data:image/png;base64,' + fs.readFileSync(`${srcDir}/icons/icon48.png`).toString('base64');
+    const popup = read(`${srcDir}/popup/popup.html`);
+    return {
+      html: popup.slice(popup.indexOf('<header>'), popup.indexOf('</main>') + 7).replace('../icons/icon48.png', icon),
+      css: read(`${srcDir}/popup/popup.css`).replace(/:root/g, ':host').replace(/^body \{/m, '.panel > div {')
+    };
+  };
+
+  // Reddit. hls.js sits in a function that runs on first use, like the extension's on-demand
+  // injection; the local exports/module/define make its UMD wrapper set globalThis.Hls.
+  const [rMain, rContent] = scripts(rMan, 'src');
+  const rPanel = panel('src');
+  const reddit = `
+const RBE_PANEL_HTML = ${JSON.stringify(rPanel.html)};
+const RBE_PANEL_CSS = ${JSON.stringify(rPanel.css)};
+const RBE_LOAD_HLS = () => { if (globalThis.Hls) return; (function () { var exports, module, define;
+${read('src/vendor/hls.min.js')}
+}).call(globalThis); };
+if (!location.pathname.startsWith('/login')) {
+${join(rMain)}
+}
+${join([...withShim(rContent, 'userscript/reddit-shim.js'), 'src/popup/popup.js', 'userscript/reddit-panel.js'])}
+${style('rbe-css', cssFiles(rMan, 'src'))}`;
+
+  // Instagram
+  const [igMain, igContent] = scripts(igMan, 'instagram/src');
+  const igPanel = panel('instagram/src');
+  const instagram = `
+const PANEL_HTML = ${JSON.stringify(igPanel.html)};
+const PANEL_CSS = ${JSON.stringify(igPanel.css)};
+${join([...igMain, ...withShim(igContent, 'instagram/userscript/shim.js'), 'instagram/src/popup/popup.js', 'instagram/userscript/panel.js'])}
+${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
+
+  // Version goes up whenever either extension's does (Tampermonkey compares it part by part)
+  const version = `${rMan.version}.${igMan.version}`;
   const header = `// ==UserScript==
-// @name         ${man.name}
-// @namespace    instagram-better-browsing
-// @version      ${man.version}
-// @description  ${man.description} Settings: Alt+W.
+// @name         Better Browsing (Reddit + Instagram)
+// @namespace    better-browsing-watdafawx
+// @version      ${version}
+// @description  Reddit Better Browsing ${rMan.version} and Instagram Better Browsing ${igMan.version} in one script. Reddit settings: the gear in Reddit's top bar; Instagram settings: Alt+W.
+// @match        https://*.reddit.com/*
 // @match        https://www.instagram.com/*
+// @exclude      https://old.reddit.com/*
 // @run-at       document-start
 // @grant        none
 // @inject-into  page
 // @noframes
+// @updateURL    ${UPDATE_URL}
+// @downloadURL  ${UPDATE_URL}
+// @homepageURL  https://github.com/watdafawx/reddit-better-browsing
 // @license      MIT
 // ==/UserScript==
 `;
-  const body = [
-    `const PANEL_HTML = ${JSON.stringify(panelHtml)};`,
-    `const PANEL_CSS = ${JSON.stringify(panelCss)};`,
-    ...parts.map(f => `// ---- ${path.basename(f)} ----\n${read(f)}`),
-    `// ---- panel.js ----\n${read('instagram/userscript/panel.js')}`,
-    `// ---- content.css ----\n(() => { const s = document.createElement('style'); s.id = 'igb-css'; s.textContent = ${JSON.stringify(read(`${ig}/content/content.css`))}; (document.head || document.documentElement).append(s); })();`
-  ].join('\n\n');
+  const site = `const host = location.hostname;
+if (host === 'www.instagram.com') {${instagram}
+} else if (/(^|\.)reddit\.com$/.test(host) && host !== 'old.reddit.com' && !location.pathname.startsWith('/media')) {${reddit}
+}`;
   // Some managers run document-start scripts before <html> exists; everything here needs it.
-  const wrapped = `(() => {\nconst start = () => {\n${body}\n};\n` +
+  const wrapped = `(() => {\nconst start = () => {\n${site}\n};\n` +
     `if (document.documentElement) start();\n` +
     `else new MutationObserver((_, o) => { if (document.documentElement) { o.disconnect(); start(); } }).observe(document, { childList: true });\n})();\n`;
-  fs.writeFileSync(path.join('dist', 'instagram-better-browsing.user.js'), `${header}\n${wrapped}`);
-  console.log('built dist/instagram-better-browsing.user.js');
+  fs.writeFileSync(path.join('dist', 'better-browsing.user.js'), `${header}\n${wrapped}`);
+  console.log('built dist/better-browsing.user.js', version);
 }

@@ -4,7 +4,7 @@ Browser extension (Manifest V3) for new Reddit, one codebase for Chrome and Fire
 
 ## Commands
 
-- `npm run build`: copies `src/` to `dist/chrome` and `dist/firefox`, writes each manifest from `manifest.base.json`, zips both. Also builds `instagram/src` into `dist/instagram-chrome`, `dist/instagram-firefox` and the userscript `dist/instagram-better-browsing.user.js`.
+- `npm run build`: copies `src/` to `dist/chrome` and `dist/firefox`, writes each manifest from `manifest.base.json`, zips both. Also builds `instagram/src` into `dist/instagram-chrome`, `dist/instagram-firefox`, and one userscript for both sites, `dist/better-browsing.user.js` (see "Userscript" below).
 - `npm test`: offline Playwright smoke test of `dist/chrome` (build first). Needs `npx playwright install chromium` once.
 - `npm run test:instagram`: the same for `dist/instagram-chrome` (`test/instagram-offline.mjs`).
 - Syntax check without a browser: `for f in src/*.js src/content/*.js src/popup/*.js; do node --check "$f"; done`
@@ -48,7 +48,16 @@ What it can't cover: Reddit's real markup (feed web components, shadow DOM playe
 
 Same rules and shape as the Reddit one, with its own `manifest.base.json` (own `version`), `src/` and global `IGB` instead of `RBE`. `build.js` lists both extensions; the Instagram one has no background script. `instagram/README.md` describes the features and how they work.
 
-- The userscript is assembled in `build.js` from the same files plus `instagram/userscript/`. A new content script must be added to both the manifest and that list.
+- The userscript part comes from the manifest's script list plus `instagram/userscript/` (see "Userscript" below).
 - Never send automated traffic to live Instagram from tests; extend the fixtures in `test/instagram-offline.mjs`.
 - Instagram's class names are generated and change often. Find things by structure, ARIA attributes and geometry (`article`, `a[href*="/p/"]`, `aria-current="step"`, `elementsFromPoint`), never by class name or by English `aria-label` text.
 - Feed videos sit inside an `<a href="/reels/…">` inside an `<article>`; grid previews are videos or images inside a link outside any `article`. `main-world.js`, `video.js` and `lightbox.js` all rely on that difference.
+
+## Userscript (`dist/better-browsing.user.js`)
+
+One Tampermonkey/Violentmonkey script for both sites, built by `build.js`. Per site it takes the content scripts in manifest order (main-world files first), inserts a shim for the extension APIs right after `defaults.js`, and adds the popup form as an in-page panel. A new content script only needs adding to the manifest.
+
+- Reddit: `userscript/reddit-shim.js` keeps `storage.sync`/`storage.local` in the page's localStorage, answers `rbe:loadHls` by running hls.js from inside the script (`RBE_LOAD_HLS`, a function so it's only parsed on first use), and sets `RBE.userscript` (account switching needs cookies, so its UI is hidden). `userscript/reddit-panel.js` mounts `popup.js` (`RBE.mountSettings(root, opts)`) in a shadow-DOM panel; the gear calls `RBE.openSettingsInPage`. Keep `popup.js` working on both `document` and a shadow root: look things up with its `$`/`$$`, not `document`.
+- Instagram: `instagram/userscript/shim.js` and `panel.js`, same idea.
+- `@version` is `<reddit version>.<instagram version>`, so it goes up whenever either does. Installed scripts check `@updateURL`, the `better-browsing.user.js` asset of the fixed GitHub release `userscript`. After a release of either extension, run `npm run release:userscript` (`gh release upload userscript … --clobber`), or installed scripts won't see it.
+- `npm test` and `npm run test:instagram` both run the userscript build too, in a browser without the extension.
