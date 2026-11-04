@@ -285,7 +285,8 @@
   }, true);
   addEventListener('dblclick', () => clearTimeout(feedTimer), true);
 
-  IGB.lightboxItem = () => lb && lb.list[lb.pi].data ? { data: lb.list[lb.pi].data, ii: lb.ii } : null;
+  IGB.lightboxNext = () => lb && goPost(lb.pi + 1);
+  IGB.lightboxItem = () =>lb && lb.list[lb.pi].data ? { data: lb.list[lb.pi].data, ii: lb.ii } : null;
   IGB.articleCode = articleCode;
   IGB.activeSlide = activeSlide;
   IGB.openLightbox = open;

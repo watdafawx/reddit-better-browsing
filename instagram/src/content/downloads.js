@@ -35,7 +35,9 @@
   const openItem = (d, i) => d.items[i]?.src && window.open(d.items[i].src, '_blank', 'noopener');
 
   // Buttons for one post. getIdx() is read at click time (carousels move).
-  function buttons(getData, getIdx, multi) {
+  // ni: { code(), art() } for the "Not interested" button (notinterested.js), or null.
+  function buttons(getData, getIdx, multi, ni) {
+    const s = IGB.settings;
     const run = fn => async e => {
       e.preventDefault(); e.stopPropagation();
       const b = e.currentTarget; b.classList.add('busy');
@@ -44,14 +46,16 @@
       finally { b.classList.remove('busy'); }
     };
     return [
-      h('button', { class: 'igb-tool', title: 'Download (Alt+S)', onclick: run((d, i) => IGB.downloadItems(d, [i])) }, '⤓'),
-      multi ? h('button', { class: 'igb-tool', title: 'Download all in this post', onclick: run(d => IGB.downloadItems(d, d.items.map((_, i) => i))) }, '⤓ All') : '',
-      h('button', { class: 'igb-tool', title: 'Open in a new tab', onclick: run(openItem) }, '↗')
-    ];
+      s.downloadTools ? h('button', { class: 'igb-tool', title: 'Download (Alt+S)', onclick: run((d, i) => IGB.downloadItems(d, [i])) }, '⤓') : '',
+      s.downloadTools && multi ? h('button', { class: 'igb-tool', title: 'Download all in this post', onclick: run(d => IGB.downloadItems(d, d.items.map((_, i) => i))) }, '⤓ All') : '',
+      s.downloadTools ? h('button', { class: 'igb-tool', title: 'Open in a new tab', onclick: run(openItem) }, '↗') : '',
+      s.notInterested && ni && IGB.notInterestedButton ? IGB.notInterestedButton(ni.code, ni.art) : ''
+    ].filter(Boolean);
   }
+  const anyTools = () => IGB.settings.downloadTools || IGB.settings.notInterested;
   // Lightbox: post data is already loaded
-  IGB.mediaTools = (d, getIdx) => IGB.settings.downloadTools
-    ? h('span', { class: 'igb-tools-inline' }, buttons(() => Promise.resolve(d), getIdx, d.items.length > 1)) : '';
+  IGB.mediaTools = (d, getIdx) => anyTools()
+    ? h('span', { class: 'igb-tools-inline' }, buttons(() => Promise.resolve(d), getIdx, d.items.length > 1, d.code ? { code: () => d.code } : null)) : '';
 
   // ---------- what's under the mouse ----------
   const onStory = () => location.pathname.startsWith('/stories/');
@@ -72,12 +76,13 @@
     const art = media.closest('article');
     if (art) {
       const code = IGB.articleCode(art);
-      return code && { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]') };
+      return code && { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]'), ni: { code: () => code, art: () => art } };
     }
     if (onStory()) return { key: 'story:' + (storyId() || ''), media, get: storyPost, idx: () => 0, multi: false };
     const code = IGB.codeOf(location.pathname);
     const scope = media.closest('[role="dialog"], main') || document.body;
-    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]') };
+    // Reels tab: the URL follows the reel on screen
+    if (code) return { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(scope), multi: !!scope.querySelector('[aria-current="step"]'), ni: { code: () => IGB.codeOf(location.pathname) || code } };
     return null;
   }
 
@@ -86,7 +91,7 @@
   let bar = null, cur = null, mx = -1, my = -1, raf = 0;
   function place() {
     raf = 0;
-    if (!IGB.settings.downloadTools || document.documentElement.hasAttribute('data-igb-lb')) return hide();
+    if (!anyTools() || document.documentElement.hasAttribute('data-igb-lb')) return hide();
     if (bar && bar.contains(document.elementFromPoint(mx, my))) return;
     let c = contextAt(mx, my);
     // The bar sits just outside the media's right edge: keep it while the mouse crosses the gap
@@ -97,8 +102,8 @@
     if (!c) return hide();
     if (!bar) { bar = h('div', { class: 'igb-root igb-tools' }); document.body.append(bar); }
     if (!cur || cur.key !== c.key || cur.media !== c.media) {
-      bar.replaceChildren(...buttons(c.get, c.idx, c.multi));
-      c.get().catch(() => {}); // warm the data so the click is instant
+      bar.replaceChildren(...buttons(c.get, c.idx, c.multi, c.ni));
+      if (IGB.settings.downloadTools) c.get().catch(() => {}); // warm the data so the click is instant
     }
     cur = c;
     // A column beside the media's top-right corner, off the picture; inside the edge only if

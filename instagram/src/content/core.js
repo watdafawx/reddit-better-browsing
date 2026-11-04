@@ -57,4 +57,23 @@
     if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + path);
     return r.json();
   };
+  // Form POST the way Instagram's web app sends them: CSRF token from the cookie, plus the
+  // www-claim header Instagram keeps in sessionStorage.
+  IGB.postForm = async function (path, data) {
+    const csrf = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)?.[1] || '';
+    let claim = '0';
+    try { claim = sessionStorage.getItem('www-claim-v2') || '0'; } catch {}
+    const r = await pageFetch(location.origin + path, {
+      method: 'POST', credentials: 'include',
+      headers: {
+        Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrf, 'X-IG-App-ID': '936619743392459', 'X-IG-WWW-Claim': claim, 'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams(data).toString()
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + path);
+    const j = await r.json().catch(() => ({}));
+    if (j.status && j.status !== 'ok') throw new Error(j.message || 'status ' + j.status);
+    return j;
+  };
 })();

@@ -7,6 +7,8 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
 - **Browser video controls on every post and reel video**: seek bar, time, volume, fullscreen, playback speed, picture-in-picture. Instagram's transparent overlay (its play button, mute button and tap handlers) is made click-through and hidden, and clicks on the controls no longer open the reel page.
 - **Sound on by default** at your chosen volume (40% to start). Instagram mutes every video it plays; the extension ignores those page-made mutes and keeps your level. If you change the volume or mute on a video yourself, that sticks for that video. Modes: play with sound, always muted, no autoplay, or leave it to Instagram.
 - Videos scrolled out of view pause, and videos loop (both optional).
+- **Reels auto-scroll**: on the Reels tab, when a reel finishes the page scrolls to the next one, like the phone app's auto-scroll (optional; reels don't loop while it's on).
+- **Not interested** (⊘), the phone app's option: in the hover buttons beside a post or reel and in the lightbox. Instagram shows fewer posts like it; the feed post collapses, the Reels tab moves on to the next reel, the lightbox to the next post. The message at the bottom has Undo.
 - **Fast lightbox** for profile, explore, tag and Reels-tab grids, and for photos in the home feed:
   - opens at once with the thumbnail already on the page, then swaps in the full-resolution image or the full MP4 (with audio, browser controls, your volume);
   - wheel or <kbd>←</kbd>/<kbd>→</kbd> go through a carousel's slides and on into the next posts; <kbd>↑</kbd>/<kbd>↓</kbd> jump by post;
@@ -37,6 +39,8 @@ Settings: the toolbar popup, the **gear at the bottom of Instagram's left sideba
 - `content/downloads.js` finds the media under the mouse with `elementsFromPoint`, works out the post (article link, page URL, or the story id in `/stories/<user>/<id>/`) and fetches the file as a blob so it can be saved under the chosen name. If the CDN refuses, it opens the file instead.
 - `content/settings.js` clones Instagram's Search entry in the sidebar into a gear entry (so it matches whatever layout Instagram is showing) and opens `popup/popup.html` in an iframe panel; the popup files are listed in `web_accessible_resources` for that.
 - The userscript build adds `instagram/userscript/shim.js` (localStorage in place of `storage.sync`) and `panel.js` (the popup form in a shadow-DOM panel). `popup.js` exposes `IGB.mountSettings(root)` so both use the same form.
+- `content/notinterested.js` sends `POST /api/v1/discover/explore_report/` with the media pk (`m_pk`) and the CSRF token from the cookie: the call behind Instagram's web hide-post option (`usePolarisHidePost`, shown only on suggested feed posts) and the phone app's "Not interested". Undo is `explore_report_undo`. The Reels tab URL follows the reel on screen, so that's where the reel's code comes from.
+- Reels auto-scroll (`content/video.js`): the Reels tab is one scroll-snap column. With the option on, reels there don't loop, and on `ended` of the reel on screen the next `<video>` is scrolled into view (or the column scrolls one reel down if the next isn't rendered yet).
 - `content/lightbox.js` reads post data from `/api/v1/media/<id>/info/` (the same endpoint Instagram's web app uses, with the page's cookies), converting the shortcode in the URL to the numeric id. One request per post, cached for the page; failures are not cached.
 
 ## Test
