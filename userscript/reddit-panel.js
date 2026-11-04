@@ -15,7 +15,7 @@
       .x { margin-left: 8px; border: 0; background: none; color: var(--weak); font-size: 18px; cursor: pointer; }
     </style><div class="panel"><div>${RBE_PANEL_HTML}</div></div>`;
     root.querySelector('header').append(RBE.h('button', { class: 'x', title: 'Close (Esc)', onclick: toggle }, '✕'));
-    host.addEventListener('click', e => { if (e.target === host) toggle(); });
+    host.addEventListener('click', e => { if (e.composedPath()[0] === host) toggle(); });   // clicks inside the shadow root also report target === host
     // keep Reddit's own key handlers away from the form's text fields
     ['keydown', 'keyup', 'keypress'].forEach(t => host.addEventListener(t, e => e.stopPropagation()));
     document.documentElement.append(host);

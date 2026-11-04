@@ -90,13 +90,24 @@
   // block cut by CSS line-clamp; clicking it opens the caption in place as well.
   const clamped = el => { const cs = getComputedStyle(el); return cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2; };
   const clicked = new WeakSet();
+  // The open caption is still Instagram's button: a click anywhere on it would fold it up again.
+  // Stop those clicks at the caption (before Instagram's handler at the page root) so it reads as
+  // plain text; links in it (hashtags, @users, addresses) still work, and text can be selected.
+  function lockOpen(btn) {
+    btn.dataset.igbCaption = '1';
+    // Instagram toggles on press (pointer/mouse/touch), not only on click: stop all of them. Its own
+    // links (#tags, @users) need its handlers to navigate; our web-address links open a tab by themselves.
+    const stop = e => { const a = e.target.closest?.('a[href]'); if (!a || a.classList.contains('igb-link')) e.stopPropagation(); };
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'].forEach(t => btn.addEventListener(t, stop, true));
+    btn.addEventListener('keydown', e => { if (e.target === btn && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation(); }, true);
+  }
   function expand() {
     if (!/^\/reels?\//.test(location.pathname)) return;
     for (const txt of document.querySelectorAll('main [role="button"] [dir="auto"]')) {
       const btn = txt.closest('[role="button"]');
-      if (clicked.has(btn) || btn.querySelector('svg, img, video') || !clamped(txt)) continue;
-      clicked.add(btn);
-      btn.click();
+      if (btn.dataset.igbCaption || btn.querySelector('svg, img, video')) continue;
+      if (clamped(txt)) { if (!clicked.has(btn)) { clicked.add(btn); btn.click(); } }
+      else if (clicked.has(btn)) lockOpen(btn);   // opened by us: keep it that way
     }
     for (const more of document.querySelectorAll('main [role="button"] span[aria-hidden="true"]')) {
       const btn = more.closest('[role="button"]');

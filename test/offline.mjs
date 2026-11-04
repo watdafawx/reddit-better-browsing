@@ -207,6 +207,10 @@ if (r.us.built) {
   await p2.waitForTimeout(300);
   await p2.click('.rbe-nav-gear').catch(() => {});
   await p2.waitForTimeout(500);
+  // real clicks inside the panel (shadow DOM) must keep it open
+  await p2.locator('.rbe-us-settings #tabs button[data-tab="video"]').click().catch(() => {});
+  await p2.waitForTimeout(300);
+  r.us.openAfterClick = await p2.evaluate(() => !!document.querySelector('.rbe-us-settings') && document.querySelector('.rbe-us-settings').shadowRoot.querySelector('#tabs .on')?.dataset.tab);
   Object.assign(r.us, await p2.evaluate(() => {
     const root = document.querySelector('.rbe-us-settings')?.shadowRoot;
     return { panelInputs: root?.querySelectorAll('[data-key]').length || 0, panelAccounts: !!root?.querySelector('[data-tab="accounts"]'), themes: root?.querySelectorAll('#themes .theme').length || 0 };
@@ -218,6 +222,13 @@ if (r.us.built) {
   await p2.keyboard.press('Escape');
   await p2.waitForTimeout(200);
   r.us.panelClosed = await p2.evaluate(() => !document.querySelector('.rbe-us-settings'));
+  // image lightbox (gallery post, opened the way the viewer does)
+  await p2.evaluate(() => RBE.openLightbox({ scope: 'post', index: 0, postData: { name: 't3_ggg', id: 'ggg', title: 'Gallery', author: 'a', subreddit_name_prefixed: 'r/test',
+    permalink: '/r/test/comments/ggg/g/', created_utc: 1, is_gallery: true, gallery_data: { items: [{ media_id: 'm1' }, { media_id: 'm2' }] },
+    media_metadata: { m1: { status: 'valid', e: 'Image', s: { u: 'https://i.redd.it/one.png', x: 800, y: 600 } }, m2: { status: 'valid', e: 'Image', s: { u: 'https://i.redd.it/two.png', x: 800, y: 600 } } } } }));
+  await p2.waitForTimeout(800);
+  r.us.lightbox = await p2.evaluate(() => { const lb = document.querySelector('.rbe-lb'); return lb && { fixed: getComputedStyle(lb).position === 'fixed', full: lb.getBoundingClientRect().width === innerWidth, img: [...lb.querySelectorAll('img')].some(i => /one\.png$/.test(i.src)), count: lb.querySelector('.rbe-lb-count')?.textContent }; });
+  await p2.keyboard.press('Escape');
   r.us.errors = usLogs;
   await b2.close();
 }
@@ -251,6 +262,8 @@ const checks = {
   'userscript: gear opens settings panel (no accounts tab)': r.us.panelInputs > 20 && !r.us.panelAccounts && r.us.themes > 3,
   'userscript: settings change saved and applied live': r.us.saved === 'nord' && r.us.applied,
   'userscript: Esc closes panel, no page errors': r.us.panelClosed && r.us.errors?.length === 0,
+  'userscript: clicks inside the settings panel keep it open': r.us.openAfterClick === 'video',
+  'userscript: image lightbox opens with the gallery': !!r.us.lightbox?.fixed && r.us.lightbox.full && r.us.lightbox.img && r.us.lightbox.count === '1/2',
 };
 let failed = 0;
 for (const [name, ok] of Object.entries(checks)) { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failed++; }
