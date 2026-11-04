@@ -23,17 +23,18 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
 2. Chrome: `chrome://extensions` → Developer mode → **Load unpacked** → pick `dist/instagram-chrome`.
    Firefox: `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `dist/instagram-firefox/manifest.json`.
 
-Settings are in the toolbar popup.
+Settings: the toolbar popup, the **gear at the bottom of Instagram's left sidebar**, or <kbd>Alt</kbd>+<kbd>W</kbd> on any Instagram page. The gear and Alt+W open the same form in a panel over the page; <kbd>Esc</kbd> or a click outside closes it.
 
 ### Or as a userscript
 
-`npm run build` also writes `dist/instagram-better-browsing.user.js`, the same code as one file for Tampermonkey or Violentmonkey. Open it in the browser (or drag it onto the manager's dashboard) to install. It runs in the page at document-start (`@grant none`) and keeps its settings in the page's localStorage; <kbd>Alt</kbd>+<kbd>W</kbd> opens the settings panel. Use either the extension or the script, not both.
+`npm run build` also writes `dist/instagram-better-browsing.user.js`, the same code as one file for Tampermonkey or Violentmonkey. Open it in the browser (or drag it onto the manager's dashboard) to install. It runs in the page at document-start (`@grant none`) and keeps its settings in the page's localStorage; the sidebar gear and <kbd>Alt</kbd>+<kbd>W</kbd> open the settings panel. Use either the extension or the script, not both.
 
 ## How it works
 
 - `main-world.js` runs in the page's own JS world and patches `HTMLMediaElement` (`play`, `muted`, `volume`, `autoplay`) so Instagram's player follows your audio setting. Settings arrive through the `<html data-igb-video>` attribute. A mute or volume change counts as yours only right after a click or key press on that video's own player.
 - `content/video.js` turns on `controls`, finds the elements stacked over each on-screen video (`elementsFromPoint`) and marks the overlay subtree `igb-ov` (click-through and invisible via `content.css`). Feed videos are wrapped in a link to the reel; its `href` is parked in `data-igb-href` while controls are on.
 - `content/downloads.js` finds the media under the mouse with `elementsFromPoint`, works out the post (article link, page URL, or the story id in `/stories/<user>/<id>/`) and fetches the file as a blob so it can be saved under the chosen name. If the CDN refuses, it opens the file instead.
+- `content/settings.js` clones Instagram's Search entry in the sidebar into a gear entry (so it matches whatever layout Instagram is showing) and opens `popup/popup.html` in an iframe panel; the popup files are listed in `web_accessible_resources` for that.
 - The userscript build adds `instagram/userscript/shim.js` (localStorage in place of `storage.sync`) and `panel.js` (the popup form in a shadow-DOM panel). `popup.js` exposes `IGB.mountSettings(root)` so both use the same form.
 - `content/lightbox.js` reads post data from `/api/v1/media/<id>/info/` (the same endpoint Instagram's web app uses, with the page's cookies), converting the shortcode in the URL to the numeric id. One request per post, cached for the page; failures are not cached.
 
