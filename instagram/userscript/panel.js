@@ -14,7 +14,7 @@
       .x { margin-left: 8px; border: 0; background: none; color: var(--weak); font-size: 18px; cursor: pointer; }
     </style><div class="panel"><div>${PANEL_HTML}</div></div>`;
     root.querySelector('header').append(IGB.h('button', { class: 'x', title: 'Close (Alt+W)', onclick: toggle }, '✕'));
-    host.addEventListener('click', e => { if (e.target === host) toggle(); });
+    host.addEventListener('click', e => { if (e.composedPath()[0] === host) toggle(); });   // clicks inside the shadow root also report target === host
     document.body.append(host);
     IGB.mountSettings(root);
   }

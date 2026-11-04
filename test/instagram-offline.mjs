@@ -428,6 +428,16 @@ if (fs.existsSync(usFile)) {
   await p2.waitForTimeout(300);
   const panel = await p2.evaluate(() => { const r = document.querySelector('.igb-settings')?.shadowRoot; return { inputs: r?.querySelectorAll('[data-key]').length, vol: r?.querySelector('[data-key="videoVolume"]')?.value }; });
   check('userscript: Alt+W settings panel', panel.inputs === 17 && panel.vol === '40', panel);
+  // real clicks inside the panel (shadow DOM) must not close it; a click on the backdrop does
+  await p2.locator('.igb-settings [data-key="videoLoop"]').click().catch(() => {});
+  await p2.waitForTimeout(300);
+  const afterInside = await p2.evaluate(() => ({ open: !!document.querySelector('.igb-settings'), loop: JSON.parse(localStorage.getItem('igb-userscript-settings') || '{}').settings?.videoLoop }));
+  await p2.mouse.click(10, 10);
+  await p2.waitForTimeout(300);
+  const afterOutside = await p2.evaluate(() => !!document.querySelector('.igb-settings'));
+  check('userscript: clicks inside the panel keep it open, backdrop closes it', afterInside.open && afterInside.loop === false && !afterOutside, { afterInside, afterOutside });
+  await p2.keyboard.press('Alt+W');
+  await p2.waitForTimeout(300);
   await p2.evaluate(() => { const sel = document.querySelector('.igb-settings')?.shadowRoot?.querySelector('[data-key="videoMode"]'); if (!sel) return; sel.value = 'muted'; sel.dispatchEvent(new Event('change')); });
   await p2.waitForTimeout(400);
   const attr2 = await p2.evaluate(() => document.documentElement.dataset.igbVideo);
