@@ -68,6 +68,37 @@
 
   window.addEventListener('click', onClick, true);
 
+  // ---------- 🔗 in each post's action row ----------
+  // Share sits in <slot name="share-button"> inside shreddit-post's open shadow root; our button goes
+  // right after it and borrows Reddit's own button classes (they're in that shadow root's stylesheet).
+  const FEED_BTN = 'rbe-feed-embed';
+  let retry = 0, retries = 0;
+  function addFeedButtons() {
+    const on = RBE.settings.embedLink !== false;
+    let pending = false;
+    for (const post of document.querySelectorAll('shreddit-post')) {
+      const sr = post.shadowRoot;
+      if (!sr) { pending = true; continue; }
+      const old = sr.querySelector('.' + FEED_BTN);
+      if (!on) { old?.remove(); continue; }
+      if (old) continue;
+      const share = sr.querySelector('slot[name="share-button"]');
+      if (!share) { pending = true; continue; }
+      if (!post.getAttribute('permalink')) continue;
+      const b = RBE.embedButton(() => post.getAttribute('permalink'),
+        FEED_BTN + ' button border-md flex flex-row justify-center items-center h-xl font-semibold relative text-12 button-secondary inline-flex items-center px-sm');
+      b.style.cssText = 'height:var(--size-button-sm-h);padding:0 12px;gap:4px';
+      b.textContent = '🔗 Discord';
+      share.after(b);
+    }
+    // Reddit renders a post's shadow root after inserting it, which the light-DOM observer doesn't see.
+    clearTimeout(retry);
+    if (pending && retries++ < 20) retry = setTimeout(addFeedButtons, 700);
+    else if (!pending) retries = 0;
+  }
+  RBE.onDomChange(() => { retries = 0; addFeedButtons(); }, 400);
+  RBE.onSettings(addFeedButtons);
+
   // ---------- hotkeys ----------
   window.addEventListener('keydown', e => {
     const t = e.target;

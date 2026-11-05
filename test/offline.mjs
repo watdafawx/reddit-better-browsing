@@ -111,6 +111,14 @@ r.embed = await page.evaluate(() => ({ copied: (document.getElementById("rbe-toa
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 r.closed = await page.evaluate(() => !document.querySelector('.rbe-viewer'));
+// 🔗 in the feed action row (shadow root with Reddit's share slot)
+await page.evaluate(() => { const p = document.querySelector('shreddit-post#t3_ccc'); p.attachShadow({ mode: 'open' }).innerHTML = '<slot></slot><div data-testid="action-row"><slot name="share-button"></slot></div>'; });
+await page.waitForTimeout(900);
+r.feedEmbed = await page.evaluate(() => { const b = document.querySelector('shreddit-post#t3_ccc').shadowRoot.querySelector('.rbe-feed-embed'); return !!b && b.previousElementSibling?.getAttribute('name') === 'share-button'; });
+await page.evaluate(() => document.querySelector('shreddit-post#t3_ccc').shadowRoot.querySelector('.rbe-feed-embed').click());
+await page.waitForTimeout(100);
+r.feedEmbedCopied = await page.evaluate(() => document.getElementById('rbe-toast')?.textContent || '');
+r.feedEmbedNoViewer = await page.evaluate(() => !document.querySelector('.rbe-viewer'));
 
 // reopen aaa → cached
 const n2 = reqs.length;
@@ -257,6 +265,7 @@ const checks = {
   'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
   'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,
+  'Discord button added next to Share in feed posts': r.feedEmbed && /rxddit\.com\/r\/test\/comments\/ccc\//.test(r.feedEmbedCopied) && r.feedEmbedNoViewer,
   'Discord link button copies rxddit.com permalink': /^https:\/\/rxddit\.com\/r\/[^/]+\/comments\/[a-z0-9]+\//.test(r.embed?.copied || '') && r.embed.inPost,
   'no page errors or dialogs': !logs.some(l => /pageerror|DIALOG/.test(l)),
   'extension popup mounts settings form': r.popup.themes > 3 && r.popup.accounts && r.popup.checked,
