@@ -195,6 +195,32 @@
     return el;
   };
 
+  // Discord shows poor previews for reddit.com links (no video); an embed-fixer domain serves the same
+  // path with the tags Discord reads. The domain is a setting because these services come and go.
+  RBE.embedUrl = function (permalink) {
+    const host = String(RBE.settings?.embedHost || 'rxddit.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'rxddit.com';
+    const path = new URL(permalink, 'https://www.reddit.com').pathname;
+    return `https://${host}${path}`;
+  };
+  RBE.copyText = async function (text) {
+    try { await navigator.clipboard.writeText(text); return; } catch {}
+    const ta = RBE.h('textarea', { style: 'position:fixed;opacity:0' }, text);
+    document.body.append(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (!ok) throw new Error('clipboard blocked');
+  };
+  RBE.copyEmbed = async function (permalink) {
+    if (!permalink) return;
+    const url = RBE.embedUrl(permalink);
+    try { await RBE.copyText(url); RBE.toast('Copied ' + url); }
+    catch { RBE.toast('Could not copy: ' + url); }
+  };
+  RBE.embedButton = (getPermalink, cls = 'rbe-btn') => RBE.settings?.embedLink === false ? null : RBE.h('button', {
+    class: cls + ' rbe-embed-btn', type: 'button', title: 'Copy link for Discord (shows the post or video in the chat)', 'aria-label': 'Copy link for Discord',
+    onclick: e => { e.preventDefault(); e.stopPropagation(); RBE.copyEmbed(getPermalink()); }
+  }, '🔗');
+
   RBE.toast = function (msg) {
     let t = document.getElementById('rbe-toast');
     if (!t) { t = RBE.h('div', { id: 'rbe-toast', class: 'rbe-root' }); document.documentElement.append(t); }

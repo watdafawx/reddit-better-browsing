@@ -151,7 +151,8 @@
         h('span', null, '▲ ', RBE.num(d.score), d.upvote_ratio ? ` (${Math.round(d.upvote_ratio * 100)}%)` : ''),
         h('span', null, '💬 ', RBE.num(d.num_comments)),
         h('a', { href: 'https://www.reddit.com' + d.permalink, target: '_blank', rel: 'noopener', class: 'rbe-muted' }, 'Open on Reddit ↗'),
-        h('button', { class: 'rbe-linkbtn', onclick: e => { navigator.clipboard.writeText('https://www.reddit.com' + d.permalink); e.target.textContent = 'Copied'; } }, 'Copy link')));
+        h('button', { class: 'rbe-linkbtn', onclick: e => { navigator.clipboard.writeText('https://www.reddit.com' + d.permalink); e.target.textContent = 'Copied'; } }, 'Copy link'),
+        RBE.embedButton(() => d.permalink, 'rbe-linkbtn')));
   }
 
   // ---------- comments ----------
@@ -292,6 +293,7 @@
         h('button', { class: 'rbe-btn', title: 'Previous post (K)', onclick: () => this.feedStep(-1) }, '▲'),
         h('button', { class: 'rbe-btn', title: 'Next post (J)', onclick: () => this.feedStep(1) }, '▼'),
         this.headTitle = h('div', { class: 'rbe-v-title' }),
+        RBE.embedButton(() => this.permalink),
         this.extLink,
         h('button', { class: 'rbe-btn', title: 'Close (Esc)', onclick: () => closeViewer() }, '✕'));
       this.panel = h('div', { class: 'rbe-v-panel' }, head, this.body);

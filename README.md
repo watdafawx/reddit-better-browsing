@@ -48,6 +48,7 @@ and click **Install**. That one script runs Reddit Better Browsing on reddit.com
 | **Accounts** | Log in once per account and click "Save current account". After that, switching is one click. |
 | **Looks** | 9 themes plus an accent color, layout presets (card posts, compact, wide feed, hide sidebars, hide ads/awards, max media height, square corners) and custom CSS. Settings can be imported and exported. |
 | **Quick bar** | A small floating bar at the bottom left with NSFW, video, spoiler and account toggles. It can be turned off. |
+| **Copy for Discord** | 🔗 in the viewer, lightbox and under each opened post copies the post link on an embed-fixer domain (`rxddit.com` by default, a setting), so Discord shows the picture or a playable video. Try `vxreddit.com` if previews stop showing. |
 
 ## Keyboard shortcuts
 

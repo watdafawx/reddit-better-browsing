@@ -254,6 +254,7 @@
         this.subIcon = h('span', { class: 'rbe-lb-subicon' }),
         h('div', { class: 'rbe-lb-info' }, this.title, this.meta),
         this.counter, this.orig,
+        RBE.embedButton(() => { const e = this.entries[this.pi]; return e?.data?.permalink || e?.el?.getAttribute('permalink'); }),
         h('button', { class: 'rbe-btn', title: 'Show/hide post text (T)', onclick: () => this.toggleSide() }, '📝'),
         h('button', { class: 'rbe-btn', title: 'Open post + comments', onclick: () => this.openPost() }, '💬'),
         h('button', { class: 'rbe-btn', title: 'Close (Esc)', onclick: () => this.close() }, '✕'));

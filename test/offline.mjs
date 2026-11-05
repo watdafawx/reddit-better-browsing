@@ -105,6 +105,9 @@ r.sortReq = reqs.slice(n1).map(q => q.u).filter(u => /sort=new/.test(u)).length;
 await page.keyboard.press('j');
 await page.waitForTimeout(500);
 r.afterJ = await page.evaluate(() => document.querySelector('.rbe-v-head .rbe-btn[title="Open on Reddit"]').href);
+await page.click('.rbe-v-head .rbe-embed-btn');
+await page.waitForTimeout(100);
+r.embed = await page.evaluate(() => ({ copied: (document.getElementById("rbe-toast")?.textContent || "").replace(/^(Copied|Could not copy:) /, ""), inPost: !!document.querySelector('.rbe-post-stats .rbe-embed-btn') }));
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 r.closed = await page.evaluate(() => !document.querySelector('.rbe-viewer'));
@@ -254,6 +257,7 @@ const checks = {
   'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
   'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,
+  'Discord link button copies rxddit.com permalink': /^https:\/\/rxddit\.com\/r\/[^/]+\/comments\/[a-z0-9]+\//.test(r.embed?.copied || '') && r.embed.inPost,
   'no page errors or dialogs': !logs.some(l => /pageerror|DIALOG/.test(l)),
   'extension popup mounts settings form': r.popup.themes > 3 && r.popup.accounts && r.popup.checked,
   'userscript: theme, quick bar, gear; no accounts button': r.us.built && r.us.theme && r.us.css && r.us.quickbar && r.us.gear && !r.us.accountsBtn && /"mode":"volume"/.test(r.us.videoAttr),
@@ -265,6 +269,7 @@ const checks = {
   'userscript: clicks inside the settings panel keep it open': r.us.openAfterClick === 'video',
   'userscript: image lightbox opens with the gallery': !!r.us.lightbox?.fixed && r.us.lightbox.full && r.us.lightbox.img && r.us.lightbox.count === '1/2',
 };
+
 let failed = 0;
 for (const [name, ok] of Object.entries(checks)) { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failed++; }
 if (failed) console.log('userscript details:', JSON.stringify(r.us));
