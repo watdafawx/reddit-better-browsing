@@ -32,6 +32,8 @@ RBE.DEFAULTS = {
   navGear: true,               // settings gear in Reddit's top nav bar
   showAvatars: true,           // user pictures + subreddit icons in the viewer and lightbox
   quickBar: true,              // small floating toolbar on Reddit pages
+  embedLink: true,             // 🔗 button: copy a link that Discord shows as an embed
+  embedHost: 'rxddit.com',     // embed-fixer domain for that link (FixReddit: rxddit.com, vxreddit.com, ...)
 
   // Looks
   theme: 'default',
