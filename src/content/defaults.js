@@ -33,7 +33,7 @@ RBE.DEFAULTS = {
   showAvatars: true,           // user pictures + subreddit icons in the viewer and lightbox
   quickBar: true,              // small floating toolbar on Reddit pages
   embedLink: true,             // 🔗 button: copy a link that Discord shows as an embed
-  embedHost: 'rxddit.com',     // embed-fixer domain for that link (FixReddit: rxddit.com, vxreddit.com, ...)
+  embedHost: 'redditez.com',   // embed-fixer domain for that link (redditez.com; rxddit.com was down in Nov 2026)
 
   // Looks
   theme: 'default',
@@ -69,6 +69,7 @@ RBE.THEMES = {
 RBE.mergeSettings = function (stored) {
   const d = RBE.DEFAULTS;
   const s = Object.assign({}, d, stored || {});
+  if (s.embedHost === 'rxddit.com') s.embedHost = d.embedHost; // 1.3.0/1.3.1 default; rxddit went down (502) in Nov 2026
   s.presets = Object.assign({}, d.presets, (stored && stored.presets) || {});
   return s;
 };
