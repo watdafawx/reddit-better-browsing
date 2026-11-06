@@ -198,7 +198,7 @@
   // Discord shows poor previews for reddit.com links (no video); an embed-fixer domain serves the same
   // path with the tags Discord reads. The domain is a setting because these services come and go.
   RBE.embedUrl = function (permalink) {
-    const host = String(RBE.settings?.embedHost || 'rxddit.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'rxddit.com';
+    const host = String(RBE.settings?.embedHost || 'redditez.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'redditez.com';
     const path = new URL(permalink, 'https://www.reddit.com').pathname;
     return `https://${host}${path}`;
   };
