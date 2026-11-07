@@ -211,7 +211,7 @@
       }
       if (item.type === 'embed') {
         return h('div', { class: cls + ' rbe-lb-embed', style: { aspectRatio: item.w && item.h ? `${item.w} / ${item.h}` : '16 / 9' } },
-          h('iframe', { src: item.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, referrerpolicy: 'no-referrer-when-downgrade' }), RBE.embedOpenLink(item));
+          h('iframe', { src: item.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, referrerpolicy: 'no-referrer-when-downgrade' }));
       }
       if (item.type === 'text') {
         const d = e?.data || {}, body = e ? bodyHtml(e) : '';
@@ -258,6 +258,7 @@
         this.subIcon = h('span', { class: 'rbe-lb-subicon' }),
         h('div', { class: 'rbe-lb-info' }, this.title, this.meta),
         this.counter, this.orig,
+        this.siteSlot = h('span', { class: 'rbe-site-slot' }),
         RBE.embedButton(() => { const e = this.entries[this.pi]; return e?.data?.permalink || e?.el?.getAttribute('permalink'); }),
         h('button', { class: 'rbe-btn', title: 'Show/hide post text (T)', onclick: () => this.toggleSide() }, '📝'),
         h('button', { class: 'rbe-btn', title: 'Open post + comments', onclick: () => this.openPost() }, '💬'),
@@ -376,6 +377,7 @@
       }
       this.meta.textContent = [d.subreddit_name_prefixed, d.author && 'u/' + d.author, d.created_utc && RBE.ago(d.created_utc)].filter(Boolean).join(' · ');
       this.counter.textContent = [items.length > 1 && `${this.ii + 1}/${items.length}`, this.entries.length > 1 && `post ${this.pi + 1}/${this.entries.length}`].filter(Boolean).join('  ·  ');
+      this.siteSlot.replaceChildren(...[RBE.siteButton(RBE.outLink(d) || RBE.outLink(e.el))].filter(Boolean));
       this.orig.href = item.src || item.link?.url || 'https://www.reddit.com' + (d.permalink || e.el?.getAttribute('permalink') || '');
       this.caption.textContent = item.caption || '';
       this.caption.hidden = !item.caption;

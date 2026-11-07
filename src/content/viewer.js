@@ -110,7 +110,7 @@
     } else if (kind === 'embed') {
       const it = items[0];
       node = h('div', { class: 'rbe-embed', style: { aspectRatio: it.w && it.h ? `${it.w} / ${it.h}` : '16 / 9' } },
-        h('iframe', { src: it.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade' }), RBE.embedOpenLink(it));
+        h('iframe', { src: it.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade' }));
     } else if (kind === 'link') {
       const it = items[0];
       node = h('a', { class: 'rbe-linkcard', href: it.url, target: '_blank', rel: 'noopener noreferrer' },
@@ -152,7 +152,8 @@
         h('span', null, '💬 ', RBE.num(d.num_comments)),
         h('a', { href: 'https://www.reddit.com' + d.permalink, target: '_blank', rel: 'noopener', class: 'rbe-muted' }, 'Open on Reddit ↗'),
         h('button', { class: 'rbe-linkbtn', onclick: e => { navigator.clipboard.writeText('https://www.reddit.com' + d.permalink); e.target.textContent = 'Copied'; } }, 'Copy link'),
-        RBE.embedButton(() => d.permalink, 'rbe-linkbtn')));
+        RBE.embedButton(() => d.permalink, 'rbe-linkbtn'),
+        RBE.siteButton(RBE.outLink(src), 'rbe-linkbtn')));
   }
 
   // ---------- comments ----------
@@ -294,6 +295,7 @@
         h('button', { class: 'rbe-btn', title: 'Next post (J)', onclick: () => this.feedStep(1) }, '▼'),
         this.headTitle = h('div', { class: 'rbe-v-title' }),
         RBE.embedButton(() => this.permalink),
+        this.siteSlot = h('span', { class: 'rbe-site-slot' }),
         this.extLink,
         h('button', { class: 'rbe-btn', title: 'Close (Esc)', onclick: () => closeViewer() }, '✕'));
       this.panel = h('div', { class: 'rbe-v-panel' }, head, this.body);
@@ -352,6 +354,7 @@
         const data = await loadThread(permalink, this.sort);
         if (token !== this.token) return;
         this.headTitle.textContent = data.post.subreddit_name_prefixed;
+        this.siteSlot.replaceChildren(...[RBE.siteButton(RBE.outLink((data.post.crosspost_parent_list || [])[0] || data.post)) ].filter(Boolean));
         const ctx = { post: data.post, sort: this.sort, viewer: this, permalink };
         this.body.replaceChildren(renderPost(data.post), renderCommentSection(data, ctx, s => this.show(permalink, null, s)));
       } catch (e) {
