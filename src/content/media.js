@@ -108,7 +108,7 @@
     const embedHtml = src.secure_media_embed?.content || src.media_embed?.content;
     if (embedHtml) {
       const m = RBE.decode(embedHtml).match(/src="([^"]+)"/);
-      if (m) return { items: [{ type: 'embed', src: m[1], w: src.secure_media_embed.width, h: src.secure_media_embed.height }], kind: 'embed' };
+      if (m) return { items: [{ type: 'embed', src: m[1], w: src.secure_media_embed?.width, h: src.secure_media_embed?.height, url: /^https?:/i.test(url || '') ? url : '', site: src.media?.oembed?.provider_name || src.domain || '' }], kind: 'embed' };
     }
 
     // External link

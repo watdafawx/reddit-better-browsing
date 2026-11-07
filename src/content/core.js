@@ -216,6 +216,25 @@
     try { await RBE.copyText(url); RBE.toast('Copied ' + url); }
     catch { RBE.toast('Could not copy: ' + url); }
   };
+  // The outside site a post points at (YouTube, Streamable, ...): { url, site } or null.
+  // Takes API post data or, for feed posts that are not loaded yet, a <shreddit-post> element.
+  RBE.outLink = function (d) {
+    let url, site;
+    if (d && d.getAttribute) { url = d.getAttribute('content-href') || ''; site = d.getAttribute('domain') || ''; }
+    else if (d) {
+      if (d.is_self || d.is_gallery) return null;
+      url = d.url_overridden_by_dest || d.url || ''; site = d.media?.oembed?.provider_name || d.domain || '';
+    }
+    if (!/^https?:\/\//i.test(url || '')) return null;
+    let host; try { host = new URL(url).hostname.replace(/^(www|m)\./, ''); } catch { return null; }
+    if (/(^|\.)(reddit\.com|redd\.it|redditmedia\.com|redditstatic\.com)$/.test(host)) return null;
+    return { url, site: site && !/^self\./.test(site) ? site : host };
+  };
+  // "↗ YouTube" button, a sibling of the Discord one
+  RBE.siteButton = (link, cls = 'rbe-btn') => link ? RBE.h('a', {
+    class: cls + ' rbe-site-btn', href: link.url, target: '_blank', rel: 'noopener noreferrer',
+    title: 'Open ' + link.site + ': ' + link.url, 'aria-label': 'Open ' + link.site
+  }, '↗ ' + link.site) : null;
   RBE.embedButton = (getPermalink, cls = 'rbe-btn') => RBE.settings?.embedLink === false ? null : RBE.h('button', {
     class: cls + ' rbe-embed-btn', type: 'button', title: 'Copy link for Discord (shows the post or video in the chat)', 'aria-label': 'Copy link for Discord',
     onclick: e => { e.preventDefault(); e.stopPropagation(); RBE.copyEmbed(getPermalink()); }

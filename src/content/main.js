@@ -80,7 +80,7 @@
       const sr = post.shadowRoot;
       if (!sr) { pending = true; continue; }
       const old = sr.querySelector('.' + FEED_BTN);
-      if (!on) { old?.remove(); continue; }
+      if (!on) { sr.querySelectorAll('.' + FEED_BTN).forEach(x => x.remove()); continue; }
       if (old) continue;
       const share = sr.querySelector('slot[name="share-button"]');
       if (!share) { pending = true; continue; }
@@ -90,6 +90,12 @@
       b.style.cssText = 'height:var(--size-button-sm-h);padding:0 12px;gap:4px';
       b.textContent = '🔗 Discord';
       share.after(b);
+      const out = RBE.outLink(post);
+      if (out) {
+        const o = RBE.siteButton(out, FEED_BTN + ' button border-md flex flex-row justify-center items-center h-xl font-semibold relative text-12 button-secondary inline-flex items-center px-sm no-underline');
+        o.style.cssText = 'height:var(--size-button-sm-h);padding:0 12px;gap:4px;text-decoration:none';
+        b.after(o);
+      }
     }
     // Reddit renders a post's shadow root after inserting it, which the light-DOM observer doesn't see.
     clearTimeout(retry);
