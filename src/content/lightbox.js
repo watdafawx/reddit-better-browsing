@@ -119,6 +119,9 @@
       this.onKey = this.onKey.bind(this);
       document.documentElement.append(this.root);
       document.documentElement.classList.add('rbe-noscroll');
+      // Page videos stop and may not restart while we're open (main-world.js watches this attribute)
+      document.documentElement.setAttribute('data-rbe-lb', '');
+      document.querySelectorAll('video').forEach(v => { if (!v.closest('.rbe-root') && !v.paused) v.pause(); });
       this.startPi = pi;
       this.savedScroll = window.scrollY;
       window.addEventListener('keydown', this.onKey, true);
@@ -190,6 +193,7 @@
       window.removeEventListener('keydown', this.onKey, true);
       RBE.destroyVideos(this.root);
       this.root.remove();
+      document.documentElement.removeAttribute('data-rbe-lb');
       if (!document.querySelector('.rbe-modal-open, .rbe-viewer.modal')) document.documentElement.classList.remove('rbe-noscroll');
       // moreFeed() scrolls the page behind the overlay to load posts; undo that.
       // Land on the post being viewed if it changed, else where the user was.

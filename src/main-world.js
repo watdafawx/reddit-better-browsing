@@ -59,8 +59,20 @@
     }
   }
 
+  // While our lightbox is open (<html data-rbe-lb>), Reddit's players behind it stay paused.
+  const lbOpen = () => document.documentElement.hasAttribute('data-rbe-lb');
+  const behindLb = el => lbOpen() && el instanceof HTMLVideoElement && !el.closest?.('.rbe-root');
+  function pausePlayed() { for (const v of played) { if (!v.isConnected) played.delete(v); else if (!v.paused) v.pause(); } }
+  new MutationObserver(() => { if (lbOpen()) pausePlayed(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-rbe-lb'] });
+  // players inside shadow roots: catch anything that starts anyway (autoplay attribute, internal resume)
+  document.addEventListener('play', e => { if (behindLb(e.target)) e.target.pause(); }, true);
   const played = new Set();   // for the safety net below (media events don't leave shadow roots)
   P.play = function () {
+    if (behindLb(this)) return Promise.resolve();
+    if (this instanceof HTMLVideoElement && !this.closest?.('.rbe-root')) { // so the lightbox can pause it, even inside shadow DOM
+      if (played.size > 40) for (const v of played) if (!v.isConnected) played.delete(v);
+      played.add(this);
+    }
     if (!active(this)) return origPlay.apply(this, arguments);
     played.add(this);
     const c = cfg();

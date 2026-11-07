@@ -64,6 +64,12 @@
     }
   }
 
+  // Backstop for playback that skips play() (autoplay attribute, resume after buffering)
+  document.addEventListener('play', e => {
+    const v = e.target;
+    if (root.hasAttribute('data-igb-lb') && v instanceof HTMLVideoElement && !ours(v)) v.pause();
+  }, true);
+
   P.play = function () {
     if (root.hasAttribute('data-igb-lb') && this instanceof HTMLVideoElement && !ours(this)) return Promise.resolve();
     if (!active(this)) return origPlay.apply(this, arguments);
