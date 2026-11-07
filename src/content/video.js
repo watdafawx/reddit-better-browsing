@@ -41,6 +41,16 @@
   // safety net for players that swap videos inside shadow roots (no light-DOM mutation); skip in background tabs
   setInterval(() => { if (!document.hidden) scan(document); }, 3000);
 
+  // play() that only falls back to muted when the browser really blocked audible autoplay.
+  // Any other rejection (AbortError when hls.js swaps in its MediaSource while play() is pending,
+  // NotSupportedError before a source exists) is not a sound problem; muting there silenced
+  // Reddit videos in the lightbox/viewer even though the stream has audio.
+  function tryPlay(v) {
+    return v.play().catch(err => {
+      if (err && err.name === 'NotAllowedError' && !v.muted) { v.muted = true; return v.play().catch(() => {}); }
+    });
+  }
+
   // For videos we create ourselves (viewer / lightbox)
   RBE.setupOwnVideo = function (v, { autoplay = true } = {}) {
     const s = RBE.settings;
@@ -53,7 +63,7 @@
     const wantsPlay = autoplay && s.videoMode !== 'off';
     if (wantsPlay) {
       v.dataset.rbeWantPlay = '1'; // hls.js retries play once the stream is ready
-      v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+      tryPlay(v);
     }
     io.observe(v);
   };
@@ -85,7 +95,7 @@
       const hls = new Hls({ capLevelToPlayerSize: true, startLevel: -1 });
       hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) { console.warn('[RBE] hls error', data.type, data.details); fallback(); } });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (v.dataset.rbeWantPlay) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+        if (v.dataset.rbeWantPlay) tryPlay(v);
       });
       hls.loadSource(item.hls);
       hls.attachMedia(v);
