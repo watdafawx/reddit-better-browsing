@@ -211,7 +211,7 @@
       }
       if (item.type === 'embed') {
         return h('div', { class: cls + ' rbe-lb-embed', style: { aspectRatio: item.w && item.h ? `${item.w} / ${item.h}` : '16 / 9' } },
-          h('iframe', { src: item.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, referrerpolicy: 'no-referrer-when-downgrade' }));
+          h('iframe', { src: item.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, referrerpolicy: 'no-referrer-when-downgrade' }), RBE.embedOpenLink(item));
       }
       if (item.type === 'text') {
         const d = e?.data || {}, body = e ? bodyHtml(e) : '';

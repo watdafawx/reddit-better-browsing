@@ -216,6 +216,13 @@
     try { await RBE.copyText(url); RBE.toast('Copied ' + url); }
     catch { RBE.toast('Could not copy: ' + url); }
   };
+  // "Open YouTube ↗" pill over an embedded player (null when the post has no outside link)
+  RBE.embedOpenLink = it => {
+    if (!it?.url) return null;
+    let site = it.site;
+    if (!site) { try { site = new URL(it.url).hostname.replace(/^(www|m)\./, ''); } catch { site = 'link'; } }
+    return RBE.h('a', { class: 'rbe-embed-open', href: it.url, target: '_blank', rel: 'noopener noreferrer', title: it.url }, 'Open ' + site + ' ↗');
+  };
   RBE.embedButton = (getPermalink, cls = 'rbe-btn') => RBE.settings?.embedLink === false ? null : RBE.h('button', {
     class: cls + ' rbe-embed-btn', type: 'button', title: 'Copy link for Discord (shows the post or video in the chat)', 'aria-label': 'Copy link for Discord',
     onclick: e => { e.preventDefault(); e.stopPropagation(); RBE.copyEmbed(getPermalink()); }

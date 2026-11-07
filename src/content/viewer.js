@@ -110,7 +110,7 @@
     } else if (kind === 'embed') {
       const it = items[0];
       node = h('div', { class: 'rbe-embed', style: { aspectRatio: it.w && it.h ? `${it.w} / ${it.h}` : '16 / 9' } },
-        h('iframe', { src: it.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade' }));
+        h('iframe', { src: it.src, allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade' }), RBE.embedOpenLink(it));
     } else if (kind === 'link') {
       const it = items[0];
       node = h('a', { class: 'rbe-linkcard', href: it.url, target: '_blank', rel: 'noopener noreferrer' },
