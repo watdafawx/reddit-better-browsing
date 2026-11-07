@@ -119,6 +119,9 @@
       this.onKey = this.onKey.bind(this);
       document.documentElement.append(this.root);
       document.documentElement.classList.add('rbe-noscroll');
+      // Page videos stop and may not restart while we're open (main-world.js watches this attribute)
+      document.documentElement.setAttribute('data-rbe-lb', '');
+      document.querySelectorAll('video').forEach(v => { if (!v.closest('.rbe-root') && !v.paused) v.pause(); });
       this.startPi = pi;
       this.savedScroll = window.scrollY;
       window.addEventListener('keydown', this.onKey, true);
@@ -190,6 +193,7 @@
       window.removeEventListener('keydown', this.onKey, true);
       RBE.destroyVideos(this.root);
       this.root.remove();
+      document.documentElement.removeAttribute('data-rbe-lb');
       if (!document.querySelector('.rbe-modal-open, .rbe-viewer.modal')) document.documentElement.classList.remove('rbe-noscroll');
       // moreFeed() scrolls the page behind the overlay to load posts; undo that.
       // Land on the post being viewed if it changed, else where the user was.
@@ -254,6 +258,7 @@
         this.subIcon = h('span', { class: 'rbe-lb-subicon' }),
         h('div', { class: 'rbe-lb-info' }, this.title, this.meta),
         this.counter, this.orig,
+        this.siteSlot = h('span', { class: 'rbe-site-slot' }),
         RBE.embedButton(() => { const e = this.entries[this.pi]; return e?.data?.permalink || e?.el?.getAttribute('permalink'); }),
         h('button', { class: 'rbe-btn', title: 'Show/hide post text (T)', onclick: () => this.toggleSide() }, '📝'),
         h('button', { class: 'rbe-btn', title: 'Open post + comments', onclick: () => this.openPost() }, '💬'),
@@ -372,6 +377,7 @@
       }
       this.meta.textContent = [d.subreddit_name_prefixed, d.author && 'u/' + d.author, d.created_utc && RBE.ago(d.created_utc)].filter(Boolean).join(' · ');
       this.counter.textContent = [items.length > 1 && `${this.ii + 1}/${items.length}`, this.entries.length > 1 && `post ${this.pi + 1}/${this.entries.length}`].filter(Boolean).join('  ·  ');
+      this.siteSlot.replaceChildren(...[RBE.siteButton(RBE.outLink(d) || RBE.outLink(e.el))].filter(Boolean));
       this.orig.href = item.src || item.link?.url || 'https://www.reddit.com' + (d.permalink || e.el?.getAttribute('permalink') || '');
       this.caption.textContent = item.caption || '';
       this.caption.hidden = !item.caption;

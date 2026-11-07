@@ -159,6 +159,19 @@ r.safety = await page.evaluate(() => new Promise(res => {
   v.dispatchEvent(new Event('play'));
   setTimeout(() => res({ muted: v.muted, vol: v.volume, active: navigator.userActivation.hasBeenActive }), 1000);
 }));
+// lightbox open (<html data-rbe-lb>): page videos are paused when they start, ours are left alone
+r.lbPause = await page.evaluate(() => {
+  document.body.insertAdjacentHTML('beforeend', '<video id="behind"></video><div class="rbe-root"><video id="mine"></video></div>');
+  const spy = id => { const v = document.getElementById(id); v.n = 0; v.pause = () => { v.n++; }; return v; };
+  const a = spy('behind'), b = spy('mine');
+  a.dispatchEvent(new Event('play')); b.dispatchEvent(new Event('play'));
+  const before = a.n;
+  document.documentElement.setAttribute('data-rbe-lb', '');
+  a.dispatchEvent(new Event('play')); b.dispatchEvent(new Event('play'));
+  const res = { before, behind: a.n, mine: b.n };
+  document.documentElement.removeAttribute('data-rbe-lb');
+  return res;
+});
 
 // settings change through storage reaches the page (filtered onChanged)
 await sw.evaluate(() => chrome.storage.sync.get('settings').then(({ settings = {} }) => chrome.storage.sync.set({ settings: { ...settings, theme: 'nord' } })));
@@ -263,6 +276,7 @@ const checks = {
   'video gets volume setting': r.video.vol === 0.1,
   'page mute after a click elsewhere ignored': r.audio.afterElsewhere === false,
   'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
+  'lightbox open pauses page videos that start, not its own': r.lbPause.before === 0 && r.lbPause.behind === 1 && r.lbPause.mine === 0,
   'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,
   'Discord button added next to Share in feed posts': r.feedEmbed && /redditez\.com\/r\/test\/comments\/ccc\//.test(r.feedEmbedCopied) && r.feedEmbedNoViewer,
