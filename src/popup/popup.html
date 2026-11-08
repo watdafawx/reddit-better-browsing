@@ -104,8 +104,9 @@
   <label class="check"><input type="checkbox" data-key="navGear"> Show settings gear in Reddit's top bar</label>
   <label class="check"><input type="checkbox" data-key="quickBar"> Show quick bar on pages (bottom-left)</label>
   <label class="check"><input type="checkbox" data-key="embedLink"> 🔗 Copy-for-Discord button in the viewer and lightbox</label>
-  <label class="row">Embed domain <input type="text" data-key="embedHost" placeholder="redditez.com" spellcheck="false"></label>
-  <p class="hint">Discord shows a playable video or picture for links on this domain. If previews stop working, try another embed-fixer domain.</p>
+  <label class="row">Embed domain <input type="text" data-key="embedHost" list="rbe-embed-hosts" placeholder="redditez.com" spellcheck="false" autocomplete="off"></label>
+  <datalist id="rbe-embed-hosts"><option value="redditez.com"><option value="vxreddit.com"><option value="rxddit.com"></datalist>
+  <p class="hint">Discord shows a playable video or picture for links on this domain. Click the box to pick <code>redditez.com</code>, <code>vxreddit.com</code> or <code>rxddit.com</code> (or type another). If previews stop working or lose sound, switch domain.</p>
 </section>
 
 <section data-panel="look">
