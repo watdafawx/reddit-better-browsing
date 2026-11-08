@@ -16,7 +16,7 @@
     const url = jsonUrl(permalink, sort);
     const hit = threads.get(url);
     if (hit && Date.now() - hit.at < THREAD_TTL) return hit.p;
-    const p = RBE.getJSON(url).then(j => {
+    const p = RBE.getJSON(url, { retries: 2 }).then(j => {
       const post = j[0].data.children[0].data;
       RBE.cachePost(post);
       return { post, comments: j[1].data.children };
@@ -463,7 +463,10 @@
       return data.post;
     } catch (e) {
       if (container._rbeToken !== token) return null;
-      container.replaceChildren(h('div', { class: 'rbe-muted' }, 'Couldn’t load comments. ', h('a', { href: 'https://www.reddit.com' + permalink, target: '_blank', rel: 'noopener' }, 'Open on Reddit ↗')));
+      const why = e?.status === 429 ? 'Reddit is rate limiting requests, wait a moment. ' : e?.status ? `Reddit answered HTTP ${e.status}. ` : '';
+      container.replaceChildren(h('div', { class: 'rbe-muted' }, 'Couldn’t load comments. ' + why,
+        h('a', { href: '#', class: 'rbe-retry', onclick: ev => { ev.preventDefault(); RBE.renderCommentsInto(container, permalink, sort); } }, 'Retry'), ' · ',
+        h('a', { href: 'https://www.reddit.com' + permalink, target: '_blank', rel: 'noopener' }, 'Open on Reddit ↗')));
       return null;
     }
   };

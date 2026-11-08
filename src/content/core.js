@@ -59,11 +59,22 @@
 
   // ---------- fetch (Firefox: use page-context fetch so cookies/CORS behave like Reddit's own) ----------
   const pageFetch = (typeof content !== 'undefined' && content && content.fetch) ? content.fetch.bind(content) : fetch.bind(globalThis);
-  RBE.getJSON = async function (pathOrUrl) {
+  // opts.retries: extra attempts after a 429 (rate limited) or 5xx, waiting Retry-After (max 5 s) or 1.5 s, 3 s...
+  RBE.getJSON = async function (pathOrUrl, opts) {
     const url = pathOrUrl.startsWith('http') ? pathOrUrl : location.origin + pathOrUrl;
-    const r = await pageFetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + url);
-    return r.json();
+    for (let left = opts?.retries || 0; ; left--) {
+      const r = await pageFetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+      if (r.ok) return r.json();
+      if (left > 0 && (r.status === 429 || r.status >= 500)) {
+        const ra = Number(r.headers.get('retry-after'));
+        const wait = ra > 0 ? Math.min(ra, 5) : 1.5 * (((opts.retries || 0) - left) + 1);
+        await new Promise(res => setTimeout(res, wait * 1000));
+        continue;
+      }
+      const err = new Error('HTTP ' + r.status + ' for ' + url);
+      err.status = r.status;
+      throw err;
+    }
   };
 
   // ---------- formatting ----------
