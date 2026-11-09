@@ -302,7 +302,7 @@ check('buttons stay up beside the post in view, mouse elsewhere', stay.shown && 
 await page.locator('.igb-tools .igb-embed-btn').click().catch(() => {});
 await page.waitForTimeout(400);
 const copied = await page.evaluate(async () => ({ toast: document.querySelector('.igb-toast')?.textContent, clip: await navigator.clipboard.readText().catch(e => 'ERR ' + e.message) }));
-check('link button copies Discord embed link (reel path for a video)', copied.clip === 'https://kkinstagram.com/reel/VIDEOBBBBBB/' && /Copied https:\/\/kkinstagram\.com\/reel\/VIDEOBBBBBB\//.test(copied.toast || ''), copied);
+check('link button copies Discord embed link (reel path for a video)', copied.clip === 'https://oginstagram.com/reel/VIDEOBBBBBB/' && /Copied https:\/\/oginstagram\.com\/reel\/VIDEOBBBBBB\//.test(copied.toast || ''), copied);
 
 // ---------- not interested ----------
 await page.goto('https://www.instagram.com/');
@@ -437,6 +437,23 @@ try {
   await page.waitForTimeout(600);
   const attr = await page.evaluate(() => document.documentElement.dataset.igbVideo);
   check('popup change reaches open page', /"mode":"muted"/.test(attr), attr);
+
+  // Embed domain: a picker like the Reddit one, and the link button follows it
+  await pop.fill('input[data-key="embedHost"]', 'vxinstagram.com');
+  await pop.locator('input[data-key="embedHost"]').dispatchEvent('change');
+  await page.waitForTimeout(600);
+  const hostSaved = await pop.evaluate(() => chrome.storage.sync.get('settings').then(({ settings = {} }) => settings.embedHost));
+  const hostOptions = await pop.locator('#igb-embed-hosts option').count();
+  await page.bringToFront();
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(300);
+  const vb = await page.locator('#vid video').boundingBox().catch(() => null);
+  if (vb) await page.mouse.move(vb.x + vb.width / 2, vb.y + vb.height / 2);
+  await page.waitForTimeout(500);
+  await page.locator('.igb-tools .igb-embed-btn').click().catch(() => {});
+  await page.waitForTimeout(300);
+  const clip2 = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  check('embed domain picker changes the copied link', hostSaved === 'vxinstagram.com' && hostOptions === 4 && /^https:\/\/vxinstagram\.com\/reel\/VIDEOBBBBBB\//.test(clip2), { hostSaved, hostOptions, clip2 });
 } catch (e) {
   check('popup change reaches open page', false, 'popup not reachable: ' + e.message);
 }

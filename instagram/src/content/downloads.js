@@ -36,8 +36,8 @@
 
   // ---------- link for Discord ----------
   // Discord shows no preview for instagram.com links; an embed-fixer domain serves the same path with
-  // the tags Discord reads (InstaFix and its forks). The domain is a setting because they come and go.
-  const embedHost = () => (IGB.settings.embedHost || 'kkinstagram.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'kkinstagram.com';
+  // the tags Discord reads (OGInstagram and its kin). The domain is a setting because they come and go.
+  const embedHost = () => (IGB.settings.embedHost || 'oginstagram.com').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'oginstagram.com';
   IGB.embedUrl = (code, reel) => `https://${embedHost()}/${reel ? 'reel' : 'p'}/${code}/`;
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return; } catch {}
