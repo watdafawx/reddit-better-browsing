@@ -47,8 +47,9 @@
   <h2>Feed and captions</h2>
   <label class="check"><input type="checkbox" data-key="notInterested"> "Not interested" button on posts, reels and in the lightbox</label>
   <label class="check"><input type="checkbox" data-key="embedLink"> Link button: copy a link that shows the post or reel as an embed in Discord</label>
-  <label class="row">Embed domain <input type="text" data-key="embedHost" spellcheck="false"></label>
-  <p class="hint">The link is <code>https://&lt;domain&gt;/p/&lt;code&gt;/</code> (or <code>/reel/</code>). If Discord stops showing the preview, try another fixer, e.g. <code>kkinstagram.com</code>, <code>instagramez.com</code>, <code>vxinstagram.com</code>, <code>ddinstagram.com</code>.</p>
+  <label class="row">Embed domain <input type="text" data-key="embedHost" list="igb-embed-hosts" placeholder="oginstagram.com" spellcheck="false" autocomplete="off"></label>
+  <datalist id="igb-embed-hosts"><option value="oginstagram.com"><option value="vxinstagram.com"><option value="kkinstagram.com"><option value="ins.so"></datalist>
+  <p class="hint">The link is <code>https://&lt;domain&gt;/p/&lt;code&gt;/</code> (or <code>/reel/</code>). Click the box to pick <code>oginstagram.com</code> (the one FixTweetBot uses), <code>vxinstagram.com</code>, <code>kkinstagram.com</code> or <code>ins.so</code> (or type another). If previews stop working, switch domain.</p>
   <label class="check"><input type="checkbox" data-key="captionExpand"> Reels: always show the full caption</label>
   <label class="check"><input type="checkbox" data-key="captionLinks"> Make web addresses in captions and comments clickable</label>
   <p class="hint">Same as the phone app's option: Instagram shows fewer posts like it. The post is hidden (a reel scrolls on); the message at the bottom has Undo.</p>

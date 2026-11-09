@@ -24,7 +24,7 @@ IGB.DEFAULTS = {
 
   // Downloads
   embedLink: true,            // 🔗 button: copy a link that Discord shows as an embed
-  embedHost: 'kkinstagram.com', // embed-fixer domain used in that link (InstaFix forks: kkinstagram.com, instagramez.com, ...)
+  embedHost: 'oginstagram.com', // embed-fixer domain used in that link (OGInstagram, the one FixTweetBot uses; others in the popup list)
   downloadTools: true,        // download / open buttons over media and in the lightbox, Alt+S
   downloadName: '{user}_{code}_{n}' // {user} {code} {n} (slide number) {date} (YYYYMMDD)
 };
