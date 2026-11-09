@@ -151,6 +151,23 @@ r.audio = await page.evaluate(() => {
   v.muted = true;
   return { afterElsewhere, afterOwn: v.muted, user: v.dataset.rbeUserAudio || null };
 });
+// clicking the post around a shadow-DOM player (upvote, comments, title) is not a click on the
+// player: Reddit's mute of that video must not stick. It used to (it counted as the user's, and
+// the protection stayed off), so a video that started with sound went back to muted.
+r.audioScope = await page.evaluate(() => new Promise(res => {
+  const art = document.createElement('article'); document.body.append(art);
+  const host = document.createElement('shreddit-player'); art.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  root.innerHTML = '<video style="width:300px;height:200px"></video><button id="pm">mute</button>';
+  const up = document.createElement('button'); art.append(up);
+  const v = root.querySelector('video');
+  Object.defineProperty(v, 'paused', { get: () => false });
+  v.play().catch(() => {});
+  up.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+  v.muted = true;                                   // Reddit mutes the player right after that click
+  const ignored = v.muted === false, tagged = v.dataset.rbeUserAudio || null;
+  setTimeout(() => res({ ignored, tagged, muted: v.muted, vol: v.volume }), 1000);
+}));
 // a playing video that ended up muted (user never muted it) gets the volume back after a click
 r.safety = await page.evaluate(() => new Promise(res => {
   document.body.insertAdjacentHTML('beforeend', '<video id="stuck" muted style="width:300px;height:200px"></video>');
@@ -276,6 +293,7 @@ const checks = {
   'video gets volume setting': r.video.vol === 0.1,
   'page mute after a click elsewhere ignored': r.audio.afterElsewhere === false,
   'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
+  'click on the post, not the player, never mutes it': r.audioScope.ignored && r.audioScope.tagged === null && r.audioScope.muted === false && Math.abs(r.audioScope.vol - 0.1) < 0.01,
   'lightbox open pauses page videos that start, not its own': r.lbPause.before === 0 && r.lbPause.behind === 1 && r.lbPause.mine === 0,
   'video stuck muted gets unmuted after a click': r.safety.active && r.safety.muted === false && Math.abs(r.safety.vol - 0.1) < 0.01,
   'theme change applies': r.themeApplied,

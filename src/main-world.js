@@ -11,19 +11,20 @@
   const setMuted = (el, v) => mutedDesc.set.call(el, v);
   const setVol = (el, v) => volDesc.set.call(el, v);
 
-  let lastGesture = 0, lastPath = new Set();
+  let lastGesture = 0, lastTarget = null;
   const gesture = () => Date.now() - lastGesture < 1200 || !!(navigator.userActivation && navigator.userActivation.isActive && Date.now() - lastGesture < 5000);
-  // A recent click/key on THIS video's own player (the video, its controls, Reddit's buttons around it,
-  // across shadow DOM). A click elsewhere (opening a post, scrolling to the next video) doesn't make
-  // Reddit's mute of a new player the user's choice.
+  // A recent click/key on THIS video's own player (the video, its controls, across shadow DOM).
+  // A click elsewhere doesn't make Reddit's mute of a player the user's choice. Clicks on the rest
+  // of the post (upvote, comments, title, Join) used to count because the walk up from the video
+  // reaches the shared <article>; that made Reddit's mute of the video stick, so a video that
+  // started with sound went back to muted. Inside a shadow root only that same root counts; in the
+  // light DOM the player's own container is at most a couple of levels up.
   const userOn = el => {
-    if (!gesture()) return false;
+    if (!gesture() || !lastTarget) return false;
+    const root = el.getRootNode();
+    if (root !== document) return lastTarget === el || lastTarget === root.host || !!root.contains?.(lastTarget);
     let p = el;
-    for (let i = 0; i < 7 && p; i++) {
-      if (lastPath.has(p)) return true;
-      p = p.parentNode instanceof ShadowRoot ? p.parentNode.host : p.parentElement;
-      if (!p || p === document.body || p === document.documentElement) break;
-    }
+    for (let i = 0; i < 3 && p; i++, p = p.parentElement) if (p.contains(lastTarget)) return true;
     return false;
   };
   const activated = () => !!navigator.userActivation?.hasBeenActive;
@@ -39,7 +40,7 @@
   const waitingForGesture = new Set();
   const onGesture = e => {
     lastGesture = Date.now();
-    lastPath = new Set(e.composedPath ? e.composedPath() : [e.target]);
+    lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
     const c = cfg();
     if (c.mode !== 'volume' || !c.volume) return;
     for (const v of waitingForGesture) {
@@ -93,14 +94,20 @@
     });
   };
 
+  const wantMuted = c => c.mode === 'muted' || !c.volume;
+  const wantVol = c => Math.max(0, Math.min(1, (c.volume || 0) / 100));
+
   // Stop Reddit from overriding our audio level; accept changes that come from the user's own clicks.
   Object.defineProperty(P, 'muted', {
     configurable: true, enumerable: true,
     get() { return mutedDesc.get.call(this); },
     set(v) {
       if (active(this) && !this.dataset.rbeUserAudio) {
-        if (userOn(this)) { this.dataset.rbeUserAudio = '1'; waitingForGesture.delete(this); }
-        else return;                            // ignore page-initiated (un)mute
+        if (!userOn(this)) return;               // ignore page-initiated (un)mute
+        // Only a change that leaves the video away from our level needs protecting from the
+        // safety net below. An unmute that lands on our level must not switch that net off.
+        if (!!v !== wantMuted(cfg())) this.dataset.rbeUserAudio = '1';
+        waitingForGesture.delete(this);
       }
       setMuted(this, v);
     }
@@ -110,8 +117,8 @@
     get() { return volDesc.get.call(this); },
     set(v) {
       if (active(this) && !this.dataset.rbeUserAudio) {
-        if (userOn(this)) this.dataset.rbeUserAudio = '1';
-        else return;
+        if (!userOn(this)) return;
+        if (Math.abs(v - wantVol(cfg())) > 0.01) this.dataset.rbeUserAudio = '1';
       }
       setVol(this, v);
     }
@@ -135,18 +142,21 @@
     if (!ours) { v.dataset.rbeUserAudio = '1'; waitingForGesture.delete(v); }
   }, true);
 
-  // Safety net: a playing video that is muted though the user never muted it gets our level back.
-  // Only after the page has had a click or key press: unmuting before that makes the browser pause it.
+  // Safety net: a playing video that is muted (or silent, e.g. volume left at 0) though the user
+  // never changed its audio gets our level back. Only after the page has had a click or key press:
+  // unmuting before that makes the browser pause it.
   // Videos inside shadow roots don't show up in querySelectorAll, so track what has played.
   document.addEventListener('play', e => { if (active(e.target)) played.add(e.target); }, true);
   setInterval(() => {
     const c = cfg();
     if (c.mode !== 'volume' || !c.volume || document.hidden || !activated()) return;
+    const want = wantVol(c);
     for (const v of played) {
       if (!v.isConnected) { played.delete(v); continue; }
-      if (v.paused || !v.muted || v.dataset.rbeUserAudio || !active(v)) continue;
+      if (v.paused || v.dataset.rbeUserAudio || !active(v)) continue;
+      if (!v.muted && Math.abs(v.volume - want) < 0.01) continue;
       waitingForGesture.delete(v);
-      setVol(v, c.volume / 100);
+      setVol(v, want);
       setMuted(v, false);
     }
   }, 600);
