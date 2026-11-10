@@ -10,7 +10,7 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
 - **Reels auto-scroll**: on the Reels tab, when a reel finishes the page scrolls to the next one, like the phone app's auto-scroll. Reels don't loop while it's on. The **Auto-scroll** button in the column of buttons beside the reel switches it (blue "Auto" when on).
 - **Full captions on Reels**: the caption opens in full instead of one line with "… more". The caption, user and Follow button stay visible and clickable over the video with browser controls on.
 - **Copy link for Discord** (link icon): copies `https://oginstagram.com/p/<code>/` (`/reel/` for reels), which Discord shows as an embed with the picture or a playable video. The domain is a setting (the popup suggests `oginstagram.com` — the fixer FixTweetBot uses — plus `vxinstagram.com`, `kkinstagram.com`, `ins.so`); embed fixers come and go (the original InstaFix, `ddinstagram.com`, was archived in 2026), so swap in another one if the preview stops showing.
-- The buttons beside a post look like Instagram's own action buttons (bare line icons in the theme's colour) and stay up: they follow the mouse, and with the mouse elsewhere they sit next to the post or reel in the middle of the window.
+- The buttons beside a post look like Instagram's own action buttons (bare line icons in the theme's colour) and stay up: they follow the mouse, and with the mouse elsewhere they sit next to the post or reel in the middle of the window. They hold still while you drag a carousel's slides.
 - **Clickable links**: web addresses in captions and comments (`https://…`, `www.…`, `linktr.ee/…`, `bit.ly/…`) become links that open in a new tab. In the lightbox, @mentions and #hashtags are links too.
 - **Not interested** (circle with a slash), the phone app's option: in the buttons beside a post or reel and in the lightbox. Instagram shows fewer posts like it; the feed post collapses, the Reels tab moves on to the next reel, the lightbox to the next post. The message at the bottom has Undo.
 - **Fast lightbox** for profile, explore, tag and Reels-tab grids, and for photos in the home feed:
@@ -20,7 +20,7 @@ Browser extension (Manifest V3, Chrome and Firefox) for instagram.com on desktop
   - user, date, the full caption, likes, comment count and download buttons sit in a panel beside the media (under it on windows narrower than 900px);
   - click a photo to see it at full size;
   - <kbd>Esc</kbd>, the browser Back button, or a click beside the media closes it. Ctrl/⌘/middle-click on a grid tile still opens Instagram's own page.
-- Feed photos open in the lightbox on a single click; a double click still likes the post.
+- Feed photos open in the lightbox on a single click; a double click still likes the post, and swiping a carousel's slides (press, drag, release) doesn't open it.
 - Stories keep Instagram's own controls (tapping there means next/previous story).
 - **Downloads**: hover a photo, video, reel or story and a column of buttons appears just right of it: **⤓** saves the current slide, **⤓ All** every slide in a carousel, **↗** opens the full-size file in a new tab. The lightbox has the same buttons, plus <kbd>D</kbd>. <kbd>Alt</kbd>+<kbd>S</kbd> saves the current story, lightbox item or whatever is under the mouse. Files come from the API at full quality and are named from a pattern you set (`{user}_{code}_{n}` by default; also `{date}`).
 

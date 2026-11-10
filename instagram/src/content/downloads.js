@@ -136,6 +136,8 @@
   let bar = null, cur = null, mx = -1, my = -1, raf = 0, dirty = false;
   function place() {
     raf = 0;
+    // While a carousel slide is being swiped the media moves; hold the buttons still
+    if (IGB.dragging()) return;
     if (!anyTools() || document.documentElement.hasAttribute('data-igb-lb')) return hide();
     // Mouse on the column: leave it where it is, but redraw it after a settings change (the
     // auto-scroll switch) and drop it after a page change
