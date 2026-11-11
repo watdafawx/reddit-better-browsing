@@ -64,9 +64,10 @@ const RBE_PANEL_CSS = ${JSON.stringify(rPanel.css)};
 const RBE_LOAD_HLS = () => { if (globalThis.Hls) return; (function () { var exports, module, define;
 ${read('src/vendor/hls.min.js')}
 }).call(globalThis); };
-if (!location.pathname.startsWith('/login')) {
+const RBE_MAIN = () => {
 ${join(rMain)}
-}
+};
+if (!location.pathname.startsWith('/login')) runMain(RBE_MAIN);
 ${join([...withShim(rContent, 'userscript/reddit-shim.js'), 'src/popup/popup.js', 'userscript/reddit-panel.js'])}
 ${style('rbe-css', cssFiles(rMan, 'src'))}`;
 
@@ -76,7 +77,11 @@ ${style('rbe-css', cssFiles(rMan, 'src'))}`;
   const instagram = `
 const PANEL_HTML = ${JSON.stringify(igPanel.html)};
 const PANEL_CSS = ${JSON.stringify(igPanel.css)};
-${join([...igMain, ...withShim(igContent, 'instagram/userscript/shim.js'), 'instagram/src/popup/popup.js', 'instagram/userscript/panel.js'])}
+const IGB_MAIN = () => {
+${join(igMain)}
+};
+runMain(IGB_MAIN);
+${join([...withShim(igContent, 'instagram/userscript/shim.js'), 'instagram/src/popup/popup.js', 'instagram/userscript/panel.js'])}
 ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
 
   // X (Twitter)
@@ -85,7 +90,11 @@ ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
   const xsite = `
 const XBB_PANEL_HTML = ${JSON.stringify(xPanel.html)};
 const XBB_PANEL_CSS = ${JSON.stringify(xPanel.css)};
-${join([...xMain, ...withShim(xContent, 'x/userscript/shim.js'), 'x/src/popup/popup.js', 'x/userscript/panel.js'])}
+const XBB_MAIN = () => {
+${join(xMain)}
+};
+runMain(XBB_MAIN);
+${join([...withShim(xContent, 'x/userscript/shim.js'), 'x/src/popup/popup.js', 'x/userscript/panel.js'])}
 ${style('xbb-css', cssFiles(xMan, 'x/src'))}`;
 
   // Version goes up whenever any extension's does (Tampermonkey compares it part by part). The last
@@ -104,7 +113,7 @@ ${style('xbb-css', cssFiles(xMan, 'x/src'))}`;
 // @exclude      https://old.reddit.com/*
 // @run-at       document-start
 // @grant        none
-// @inject-into  page
+// @inject-into  auto
 // @noframes
 // @updateURL    ${UPDATE_URL}
 // @downloadURL  ${UPDATE_URL}
@@ -119,7 +128,29 @@ if (host === 'www.instagram.com') {${instagram}
 } else if (/(^|\.)reddit\.com$/.test(host) && host !== 'old.reddit.com' && !location.pathname.startsWith('/media')) {${reddit}
 }`;
   // Some managers run document-start scripts before <html> exists; everything here needs it.
-  const wrapped = `(() => {\nconst start = () => {\n${site}\n};\n` +
+  // The page-world hooks (the main-world files) must run in the page's own JS world. With @inject-into auto a
+  // manager may put the whole script in its content realm instead: Firefox does that when a nonce CSP (X,
+  // Reddit) blocks inline <script>s without the nonce ('unsafe-inline' is ignored once a nonce is present).
+  // There `window.wrappedJSObject` exists, so the hooks go to the page as a <script> carrying a nonce taken
+  // from one of the page's own scripts. In the page world (Chrome, Firefox without CSP) they simply run.
+  const RUN_MAIN = `const runMain = fn => {
+  if (typeof window.wrappedJSObject === 'undefined') { fn(); return; }
+  const root = document.documentElement, flag = 'data-bb-main';
+  const src = '(' + fn + ')();document.documentElement.setAttribute("' + flag + '","1");';
+  const put = nonce => {
+    const s = document.createElement('script');
+    if (nonce) s.nonce = nonce;
+    s.textContent = src; root.append(s); s.remove();
+    const ok = root.hasAttribute(flag); root.removeAttribute(flag); return ok;
+  };
+  const nonceOf = () => { for (const s of document.querySelectorAll('script')) if (s.nonce) return s.nonce; return ''; };
+  const n = nonceOf();
+  if (put(n) || n) return;
+  const mo = new MutationObserver(() => { const m = nonceOf(); if (m) { mo.disconnect(); put(m); } });
+  mo.observe(document, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', () => mo.disconnect(), { once: true });
+};`;
+  const wrapped = `(() => {\n${RUN_MAIN}\nconst start = () => {\n${site}\n};\n` +
     `if (document.documentElement) start();\n` +
     `else new MutationObserver((_, o) => { if (document.documentElement) { o.disconnect(); start(); } }).observe(document, { childList: true });\n})();\n`;
   fs.writeFileSync(path.join('dist', 'better-browsing.user.js'), `${header}\n${wrapped}`);
