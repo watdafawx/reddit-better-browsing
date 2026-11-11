@@ -61,10 +61,23 @@ ${tweet('t4', 'erin', '444', `<div data-testid="tweetPhoto">${player('gif', 300,
 <div style="height:900px"></div>
 </main><div id="layers"></div></body></html>`;
 
+// A feed of single-video tweets with gaps (for the middle-of-screen rule) and a tweet with four videos
+const withMain = main => home.replace(/<main[\s\S]*<\/main>/,'<main style="margin-left:260px;padding-top:10px">' + main + '</main>');
+const gap = h => '<div style="height:' + h + 'px"></div>';
+const feed = withMain([1, 2, 3, 4, 5].map(n => tweet('ft' + n, 'u' + n, '50' + n, player('f' + n)) + gap(120)).join('') + gap(900));
+const cell = id => player(id, 240, 135).replace('position:relative;', 'position:relative;float:left;');
+const multi = withMain(gap(40) + tweet('m', 'multi', '600', '<div style="width:480px;height:270px">' + ['m1', 'm2', 'm3', 'm4'].map(cell).join('') + '</div>') + gap(1400));
+const pages = { '/feed': feed, '/multi': multi };
+
 const fixtures = route => {
   const u = new URL(route.request().url());
-  if (u.pathname.endsWith('.webm')) return route.fulfill({ status: 200, contentType: 'video/webm', body: CLIP, headers: { 'accept-ranges': 'none' } });
-  if (u.hostname === 'x.com') return route.fulfill({ status: 200, contentType: 'text/html', body: home });
+  if (u.pathname.endsWith('.webm')) {   // with Range support, so the test can seek
+    const m = /bytes=(d+)-(d*)/.exec(route.request().headers().range || '');
+    if (!m) return route.fulfill({ status: 200, contentType: 'video/webm', body: CLIP, headers: { 'accept-ranges': 'bytes' } });
+    const a = +m[1], b = m[2] ? Math.min(+m[2], CLIP.length - 1) : CLIP.length - 1;
+    return route.fulfill({ status: 206, contentType: 'video/webm', body: CLIP.subarray(a, b + 1), headers: { 'accept-ranges': 'bytes', 'content-range': 'bytes ' + a + '-' + b + '/' + CLIP.length } });
+  }
+  if (u.hostname === 'x.com') return route.fulfill({ status: 200, contentType: 'text/html', body: pages[u.pathname] || home });
   return route.fulfill({ status: 404, body: '' });
 };
 
@@ -72,8 +85,8 @@ const fixtures = route => {
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const logs = [], ok = {}, r = {};
 const check = (name, cond, detail) => { ok[name] = !!cond; r[name] = detail; };
-async function open(seed) {
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+async function open(seed, urlPath = '/home', height = 900) {
+  const ctx = await browser.newContext({ viewport: { width: 1400, height } });
   await ctx.route(/x\.com|example\.test/, fixtures);
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'https://x.com' });
   await ctx.addInitScript(seed ? `localStorage.setItem('xbb-userscript-settings', ${JSON.stringify(JSON.stringify({ settings: seed }))});` : '');
@@ -81,7 +94,7 @@ async function open(seed) {
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error' || /XBB/.test(m.text())) logs.push(`[${m.type()}] ${m.text()}`); });
   page.on('pageerror', e => logs.push('[pageerror] ' + e.message));
-  await page.goto('https://x.com/home');
+  await page.goto('https://x.com' + urlPath);
   return { ctx, page };
 }
 const vids = page => page.evaluate(() => ['v1', 'v2', 'v3', 'gif'].map(id => { const v = document.getElementById(id); return { id, playing: !v.paused && !v.ended, muted: v.muted, volume: +v.volume.toFixed(2), controls: v.controls, loop: v.loop }; }));
@@ -245,6 +258,101 @@ const click = async (page, sel) => { const b = await page.locator(sel).boundingB
   const st = await vids(page);
   const btns = await page.evaluate(() => document.querySelectorAll('.xbb-acts').length);
   check('mode "X decides" + features off: no controls, no buttons, X plays its own videos', !st[0].controls && playing(st).split(',').length === 3 && btns === 0, { st, btns });
+  await ctx.close();
+}
+
+// ---------- which video plays: the one nearest the middle of the screen ----------
+const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; return ids.map(id => { const v = document.getElementById(id), r = v.getBoundingClientRect();
+  const vis = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / Math.min(r.height, innerHeight);
+  return { id, vis, dist: Math.abs(r.top + r.height / 2 - mid), playing: !v.paused && !v.ended, controls: v.controls }; }); }, ids);
+{
+  const ids = ['f1', 'f2', 'f3', 'f4', 'f5'], H = 700;
+  const { ctx, page } = await open(null, '/feed', H);
+  await page.waitForTimeout(1500);
+  const bad = [], seen = new Set();
+  // down the feed and back up: after each stop, what plays is (about as) central as the most central video in view
+  for (const y of [0, 150, 320, 480, 650, 820, 1000, 1180, 1350, 1180, 1000, 820, 650, 480, 320, 150, 0]) {
+    await page.evaluate(y => window.scrollTo(0, y), y);
+    await page.waitForTimeout(900);
+    const g = await geo(page, ids);
+    const cand = g.filter(v => v.vis >= 0.5), run = g.filter(v => v.playing);
+    if (run.length > 1) bad.push({ y, why: 'more than one plays', run: run.map(v => v.id) });
+    if (cand.length) {
+      const best = Math.min(...cand.map(v => v.dist));
+      if (!run.length || run[0].dist > best + H * 0.08 + 1) bad.push({ y, why: 'not the most central', run: run.map(v => v.id), cand: cand.map(v => [v.id, Math.round(v.dist)]) });
+      else seen.add(run[0].id);
+    } else if (run.length && run[0].vis < 0.05) bad.push({ y, why: 'offscreen video plays' });
+  }
+  check('feed: the video nearest the middle plays at every scroll stop (down and up)', bad.length === 0, bad);
+  check('feed: playback moved through several videos', seen.size >= 4, [...seen]);
+  await ctx.close();
+}
+
+// ---------- a tweet with several videos: they play one after another ----------
+{
+  const ids = ['m1', 'm2', 'm3', 'm4'];
+  const { ctx, page } = await open(null, '/multi', 900);
+  await page.waitForTimeout(1800);
+  const run = async () => (await geo(page, ids)).filter(v => v.playing).map(v => v.id);
+  const order = [];
+  for (let i = 0; i < 4; i++) {
+    const now = await run();
+    if (now.length !== 1) { order.push('(' + now.join('+') + ')'); break; }
+    order.push(now[0]);
+    await page.evaluate(id => { const v = document.getElementById(id); v.currentTime = v.duration - 0.3; }, now[0]);
+    await page.waitForTimeout(1800);
+  }
+  check('multi: each video that ends hands over to the next, one at a time, none twice', order.length === 4 && new Set(order).size === 4 && order.every(o => /^m[1-4]$/.test(o)), order);
+  await ctx.close();
+}
+
+// ---------- a tweet with several videos: you stay in charge ----------
+{
+  const ids = ['m1', 'm2', 'm3', 'm4'];
+  const { ctx, page } = await open(null, '/multi', 900);
+  await page.waitForTimeout(1800);
+  const run = async () => (await geo(page, ids)).filter(v => v.playing).map(v => v.id);
+  let g = await geo(page, ids);
+  check('multi: every video has the browser controls', g.every(v => v.controls), g);
+  let r1 = await run();
+  check('multi: exactly one of the four videos plays', r1.length === 1, r1);
+  const nearest = Math.min(...g.filter(v => v.vis >= 0.5).map(v => v.dist));
+  check('multi: it is in the row nearest the middle', g.find(v => v.id === r1[0]).dist <= nearest + 1, g);
+
+  const other = ids.find(id => id !== r1[0] && id !== 'm4');
+  await click(page, '#' + other);
+  await page.waitForTimeout(800);
+  check('multi: clicking another video takes over, the first stops', (await run()).join() === other, await run());
+
+  await click(page, '#' + other);   // pause it
+  await page.waitForTimeout(500);
+  await page.mouse.wheel(0, 3); await page.waitForTimeout(400); await page.mouse.wheel(0, -3);
+  await page.waitForTimeout(1300);
+  check('multi: your pause sticks, none of the others starts', (await run()).length === 0, await run());
+
+  await click(page, '#m4');
+  await page.waitForTimeout(700);
+  check('multi: starting a third video plays it alone', (await run()).join() === 'm4', await run());
+  await page.evaluate(() => { const v = document.getElementById('m4'); v.currentTime = v.duration - 0.3; });
+  await page.waitForTimeout(2000);
+  const after = await run();
+  check('multi: after a video you started ends, the one you paused stays paused and nothing else starts', after.length === 0, after);
+
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await page.waitForTimeout(1500);
+  check('multi: scrolled past the tweet, all of them pause', (await run()).length === 0, await run());
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1500);
+  check('multi: scrolled back, exactly one plays again', (await run()).length === 1, await run());
+  await ctx.close();
+}
+{
+  // one-at-a-time off: every video that is well in view plays
+  const ids = ['m1', 'm2', 'm3', 'm4'];
+  const { ctx, page } = await open({ videoOneAtATime: false }, '/multi', 900);
+  await page.waitForTimeout(1800);
+  const g = await geo(page, ids);
+  check('multi, one-at-a-time off: all four play', g.every(v => v.playing), g);
   await ctx.close();
 }
 

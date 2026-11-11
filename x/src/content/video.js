@@ -1,5 +1,5 @@
 /* Tweet videos: browser controls, and one video playing at a time.
-   Which video plays: the one you started (until it scrolls away), else the one most in view. Pausing a
+   Which video plays: the one you started (until it scrolls away), else the one nearest the middle of the screen. Pausing a
    video yourself sticks: it never restarts on its own while it is on screen, and nothing else starts
    in its place. No timers fight with X's player; the work runs on scroll/visibility changes and your clicks. */
 (() => {
@@ -85,10 +85,12 @@
     let best = chosen;
     if (!best && !hush && s.videoMode !== 'off') {   // no autoplay: only a video you started is ever the pick
       const cand = list.filter(v => sc(v) >= 0.5 && !v.ended && !userPaused.has(v));
+      // the video nearest the middle of the screen wins. The current pick only keeps it while it is
+      // about as central as the best one, so scrolling a little never swaps videos but a clearly
+      // more central one always takes over (not whichever was playing first while still in view)
       const mid = innerHeight / 2, dist = v => { const r = v.getBoundingClientRect(); return Math.abs(r.top + r.height / 2 - mid); };
-      // keep the current pick while it is still well in view, so scrolling a little never swaps videos
-      if (pick && cand.includes(pick) && sc(pick) >= 0.35) best = pick;
-      else best = cand.sort((a, b) => sc(b) - sc(a) || dist(a) - dist(b))[0] || null;
+      best = cand.sort((a, b) => dist(a) - dist(b))[0] || null;
+      if (pick && pick !== best && cand.includes(pick) && dist(pick) <= dist(best) + innerHeight * 0.08) best = pick;
     }
     setPick(best);
 
