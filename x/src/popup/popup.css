@@ -1,0 +1,28 @@
+:root {
+  --bg: #ffffff; --text: #1c1c1e; --weak: #6b6b72; --line: #e4e4e8; --accent: #1d9bf0; --field: #f4f4f6;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #121214; --text: #ececf0; --weak: #9a9aa3; --line: #2a2a30; --accent: #4db5f7; --field: #1d1d21; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; width: 380px; background: var(--bg); color: var(--text); font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+h1 { font-size: 17px; font-weight: 650; margin: 0; flex: 1; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--weak); margin: 0 0 8px; }
+main { padding: 4px 14px 12px; }
+section { padding: 10px 0; border-bottom: 1px solid var(--line); }
+section:last-child { border-bottom: 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+.row span { display: flex; align-items: center; gap: 6px; }
+.check { display: flex; gap: 8px; align-items: flex-start; margin: 7px 0; }
+.check input { margin-top: 2px; accent-color: var(--accent); }
+select { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; max-width: 220px; }
+input[type=text] { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: 12px ui-monospace, monospace; width: 200px; }
+code { font: 11px ui-monospace, monospace; }
+input[type=range] { accent-color: var(--accent); width: 140px; }
+output { min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.hint { color: var(--weak); font-size: 12px; margin: 8px 0 0; }
+kbd { background: var(--field); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; }
+.saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity .2s; }
+.saved.on { opacity: 1; }

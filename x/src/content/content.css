@@ -1,0 +1,32 @@
+/* ---------- native video controls ---------- */
+/* X lays its own controls (play, mute, time, captions) over every video, in a layer after the one that
+   holds the <video>. With browser controls on, that layer is invisible and click-through. */
+html.xbb-native [data-testid="videoPlayer"] [data-testid="videoComponent"] > :not(:has(video)),
+html.xbb-native [data-testid="videoPlayer"] [data-testid="videoComponent"] > :not(:has(video)) * {
+  pointer-events: none !important;
+}
+html.xbb-native [data-testid="videoPlayer"] [data-testid="videoComponent"] > :not(:has(video)) { opacity: 0 !important; }
+
+/* ---------- one-click retweet: hide the menu while we confirm it ---------- */
+html.xbb-rt #layers [role="menu"],
+html.xbb-rt #layers [data-testid="Dropdown"] { opacity: 0 !important; }
+
+/* ---------- lighter page ---------- */
+html.xbb-light *, html.xbb-light *::before, html.xbb-light *::after {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+
+/* ---------- buttons in a tweet's action bar ---------- */
+.xbb-acts { display: flex; align-items: center; gap: 0; color: rgb(113, 118, 123); }
+.xbb-act {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: transparent; color: inherit; transition: background-color .15s, color .15s;
+}
+.xbb-act:hover, .xbb-act:focus-visible { background: rgba(29, 155, 240, .1); color: rgb(29, 155, 240); outline: 0; }
+.xbb-act.done { color: rgb(0, 186, 124); }
+.xbb-act.on { color: rgb(249, 24, 128); }
+.xbb-act.xbb-lr:hover { background: rgba(0, 186, 124, .1); color: rgb(0, 186, 124); }
+.xbb-act.xbb-lr.on:hover { background: rgba(249, 24, 128, .1); color: rgb(249, 24, 128); }
+.xbb-ico { display: block; width: 20px; height: 20px; }
+.xbb-ico svg { display: block; }

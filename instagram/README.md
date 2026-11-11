@@ -34,7 +34,7 @@ Settings: the toolbar popup, the **gear at the bottom of Instagram's left sideba
 
 ### Or as a userscript
 
-One userscript covers Instagram and Reddit and updates itself: with Tampermonkey or Violentmonkey, open https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js and click **Install** (see the main [README](../README.md#or-as-one-userscript-for-reddit-and-instagram-auto-updates)). `npm run build` writes it to `dist/better-browsing.user.js`. It runs in the page at document-start (`@grant none`) and keeps its settings in the page's localStorage; the sidebar gear and <kbd>Alt</kbd>+<kbd>W</kbd> open the settings panel. Use either the extension or the script, not both.
+One userscript covers Instagram and Reddit and updates itself: with Tampermonkey or Violentmonkey, open https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js and click **Install** (see the main [README](../README.md#as-one-userscript-for-reddit-instagram-and-x-auto-updates)). `npm run build` writes it to `dist/better-browsing.user.js`. It runs in the page at document-start (`@grant none`) and keeps its settings in the page's localStorage; the sidebar gear and <kbd>Alt</kbd>+<kbd>W</kbd> open the settings panel. Use either the extension or the script, not both.
 
 ## How it works
 

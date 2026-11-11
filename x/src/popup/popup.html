@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X Better Browsing</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <img src="../icons/icon48.png" alt="" width="22" height="22">
+  <h1>X Better Browsing</h1>
+  <span id="saved" class="saved">Saved</span>
+</header>
+<main>
+<section>
+  <h2>Video</h2>
+  <label class="row">Sound
+    <select data-key="videoMode">
+      <option value="volume">Play with sound</option>
+      <option value="muted">Always muted</option>
+      <option value="off">No autoplay (click to play, with sound)</option>
+      <option value="default">X decides (hands off)</option>
+    </select>
+  </label>
+  <label class="row">Volume <span><input type="range" min="0" max="100" data-key="videoVolume"><output></output>%</span></label>
+  <label class="check"><input type="checkbox" data-key="nativeControls"> Browser video controls (seek bar, volume, fullscreen, speed)</label>
+  <label class="check"><input type="checkbox" data-key="videoOneAtATime"> Only one video plays at a time</label>
+  <label class="check"><input type="checkbox" data-key="videoPauseOffscreen"> Pause videos scrolled out of view</label>
+  <label class="check"><input type="checkbox" data-key="videoLoop"> Loop videos</label>
+  <p class="hint">One at a time: the video you start (or pause) is the one that counts; otherwise the one most in view plays. Pausing a video yourself keeps it paused and keeps others quiet while it is on screen. Volume changes you make with the controls carry to the next videos until the page reloads.<br>Browsers block sound until you've clicked the page once; videos start muted until then and unmute on your first click.</p>
+</section>
+<section>
+  <h2>Tweets</h2>
+  <label class="check"><input type="checkbox" data-key="quickRetweet"> One-click retweet (skips the Repost / Quote menu; <kbd>Shift</kbd>+click shows it)</label>
+  <label class="check"><input type="checkbox" data-key="likeRetweet"> Like + Retweet button</label>
+  <label class="check"><input type="checkbox" data-key="embedLink"> Link button: copy a tweet link that shows the tweet and its video as an embed in Discord</label>
+  <label class="row">Embed domain <input type="text" data-key="embedHost" list="xbb-embed-hosts" placeholder="vxtwitter.com" spellcheck="false" autocomplete="off"></label>
+  <datalist id="xbb-embed-hosts"><option value="vxtwitter.com"><option value="fxtwitter.com"><option value="fixupx.com"><option value="fixvx.com"></datalist>
+  <p class="hint">The link is <code>https://&lt;domain&gt;/&lt;user&gt;/status/&lt;id&gt;</code>. Click the box to pick <code>vxtwitter.com</code>, <code>fxtwitter.com</code>, <code>fixupx.com</code> or <code>fixvx.com</code> (or type another). If previews stop working, switch domain.</p>
+</section>
+<section>
+  <h2>Page</h2>
+  <label class="check"><input type="checkbox" data-key="lighterPage"> Lighter page (no backdrop blur effects)</label>
+  <label class="check"><input type="checkbox" data-key="settingsGear"> Settings entry in X's sidebar</label>
+  <p class="hint"><kbd>Alt</kbd>+<kbd>W</kbd> opens these settings on any x.com page.</p>
+</section>
+</main>
+<script src="../content/defaults.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

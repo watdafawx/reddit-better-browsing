@@ -11,28 +11,28 @@ A Chrome and Firefox extension for the new Reddit layout (www.reddit.com). Read 
 
 ## Install
 
-Download the zip for your browser from the [Releases](../../releases) page, or build it yourself (see [Development](#development)).
+**The userscript is the release** (below): one script for Reddit, Instagram and X that updates itself. The browser extensions below are no longer released or zipped; `npm run build:ext` still builds them unpacked (see [Development](#development)).
 
 **Chrome, Edge, Brave**
-1. Unzip `reddit-better-browsing-chrome.zip`.
+1. Run `npm run build:ext`.
 2. Open `chrome://extensions` and turn on **Developer mode**.
-3. Click **Load unpacked** and pick the unzipped folder.
+3. Click **Load unpacked** and pick `dist/chrome`.
 
 **Firefox 128+**
-- Try it: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and pick `manifest.json` in the unzipped `reddit-better-browsing-firefox` folder. Firefox removes temporary add-ons when it restarts.
-- Keep it: sign the zip for free as an *unlisted* add-on at addons.mozilla.org, or use Firefox Developer Edition / Nightly with `xpinstall.signatures.required = false`.
+- Try it: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and pick `dist/firefox/manifest.json`. Firefox removes temporary add-ons when it restarts.
+- Keep it: sign `dist/firefox` (zipped) for free as an *unlisted* add-on at addons.mozilla.org, or use Firefox Developer Edition / Nightly with `xpinstall.signatures.required = false`.
 
 Click the toolbar icon (or the gear the extension adds to Reddit's top bar) to open settings. Settings sync between browsers signed in to the same account.
 
-### Or as one userscript for Reddit and Instagram (auto-updates)
+### As one userscript for Reddit, Instagram and X (auto-updates)
 
 With [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) installed, open
 https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js
-and click **Install**. That one script runs Reddit Better Browsing on reddit.com and [Instagram Better Browsing](instagram/README.md) on instagram.com, and the manager updates it by itself when a new version is released.
+and click **Install**. That one script runs Reddit Better Browsing on reddit.com, [Instagram Better Browsing](instagram/README.md) on instagram.com and [X Better Browsing](x/README.md) on x.com (browser video controls with one video playing at a time, sound on, one-click retweet, Like + Retweet, copy link for Discord), and the manager updates it by itself when a new version is released. It replaces the older single-purpose X scripts.
 
 - Same features as the extensions, except **account switching** (it swaps Reddit's login cookies, which a userscript can't reach).
-- Settings: the gear in Reddit's top bar (or the quick bar's ⚙️); on Instagram the sidebar gear or <kbd>Alt</kbd>+<kbd>W</kbd>. They're kept in each site's localStorage, so they don't sync between browsers.
-- Use either the script or the extensions for a site, not both: they'd both control the same videos.
+- Settings: the gear in Reddit's top bar (or the quick bar's ⚙️); on Instagram and X the sidebar gear or <kbd>Alt</kbd>+<kbd>W</kbd>. They're kept in each site's localStorage, so they don't sync between browsers.
+- Use either the script or an extension for a site, not both: they'd both control the same videos.
 - Chrome needs userscripts allowed: on `chrome://extensions`, open the manager's **Details** and turn on **Allow user scripts** (or Developer mode on older versions).
 
 ## Features
@@ -80,7 +80,8 @@ Requires Node 22 or newer. There are no runtime dependencies; Playwright is only
 
 ```bash
 npm install          # only needed for the test
-npm run build        # src/ -> dist/chrome, dist/firefox and a zip of each
+npm run build        # all three sites -> dist/better-browsing.user.js (the release)
+npm run build:ext    # also dist/chrome, dist/firefox, dist/instagram-* (unpacked, for the tests)
 npx playwright install chromium   # once, for the test
 npm test             # offline smoke test of dist/chrome
 ```
@@ -109,22 +110,22 @@ src/
   popup/              settings page (toolbar popup, options page and in-page panel)
   vendor/hls.min.js   hls.js, injected only when one of our players needs it
 manifest.base.json    shared manifest; build.js adds the per-browser background entry
-build.js              builds dist/ and the zips (no dependencies)
+build.js              builds dist/ (no dependencies)
 test/offline.mjs      Playwright smoke test against fixture pages, never hits live Reddit
+instagram/, x/       the Instagram part (extension + userscript) and the X part (userscript only)
 ```
 
 See [CLAUDE.md](CLAUDE.md) for how the pieces fit together and the rules to keep when changing them.
 
 ### Releasing
 
-1. Bump `version` in `manifest.base.json` (and `package.json`).
-2. Run `npm run build` and `npm test`.
-3. Attach `dist/reddit-better-browsing-chrome.zip` and `dist/reddit-better-browsing-firefox.zip` to a GitHub release.
-4. Update the userscript: `npm run release:userscript` (uploads `dist/better-browsing.user.js` to the fixed `userscript` release that installed scripts check). Do this after an Instagram release too.
+1. Bump `version` in the part you changed (`manifest.base.json` and `package.json` for Reddit, `instagram/manifest.base.json`, `x/manifest.base.json`).
+2. Run `npm test`, `npm run test:instagram` and `npm run test:x`.
+3. `npm run build`, then `npm run release:userscript` (uploads `dist/better-browsing.user.js` to the fixed `userscript` release that installed scripts check).
 
-## Instagram
+## Instagram and X
 
-`instagram/` holds a second extension for instagram.com: browser video controls on every video, sound on by default at your volume, and a fast lightbox. `npm run build` builds it too (`dist/instagram-chrome`, `dist/instagram-firefox`), and the combined userscript `dist/better-browsing.user.js`. See [instagram/README.md](instagram/README.md).
+`instagram/` holds a second extension for instagram.com: browser video controls on every video, sound on by default at your volume, and a fast lightbox. `npm run build` builds it too (`dist/instagram-chrome`, `dist/instagram-firefox`), and the combined userscript `dist/better-browsing.user.js`. See [instagram/README.md](instagram/README.md). `x/` holds the X part (userscript only, no extension): [x/README.md](x/README.md).
 
 ## License
 
