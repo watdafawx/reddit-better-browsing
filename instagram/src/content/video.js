@@ -107,6 +107,18 @@
     if (a && !a.hasAttribute('href')) a.setAttribute('href', a.dataset.igbHref);
   }
 
+  // Tab hidden or window unfocused: pause whatever plays (not Picture-in-Picture), and stop Instagram starting more
+  let blurred = false;
+  const away = () => !!IGB.settings.videoPauseOnHide && (document.hidden || blurred);
+  const pauseAway = () => {
+    if (!away()) return;
+    document.querySelectorAll('video').forEach(v => { if (!v.paused && document.pictureInPictureElement !== v) v.pause(); });
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseAway(); });
+  addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
+  addEventListener('focus', () => { blurred = false; });
+  document.addEventListener('play', e => { if (away() && e.target instanceof HTMLVideoElement) e.target.pause(); }, true);
+
   const io = new IntersectionObserver(entries => {
     for (const e of entries) {
       const v = e.target;

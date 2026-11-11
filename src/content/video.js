@@ -4,22 +4,36 @@
   ['pointerdown', 'keydown', 'touchstart'].forEach(t => window.addEventListener(t, () => { lastGesture = Date.now(); }, true));
   const gesture = () => Date.now() - lastGesture < 1200;
 
+  // Tab hidden or window unfocused: pause everything that plays, and let nothing start meanwhile
+  const known = new Set();         // every <video> guard() has seen, including those inside players' shadow roots
+  let blurred = false;
+  const away = () => !!RBE.settings.videoPauseOnHide && (document.hidden || blurred);
+  const pauseAway = () => {
+    if (!away()) return;
+    for (const v of known) { if (!v.isConnected) known.delete(v); else if (!v.paused && document.pictureInPictureElement !== v) v.pause(); }
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseAway(); });
+  addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
+  addEventListener('focus', () => { blurred = false; });
+
   const seen = new WeakSet();
   const io = new IntersectionObserver(entries => {
     const s = RBE.settings;
     for (const e of entries) {
       const v = e.target;
       if (!e.isIntersecting && s.videoPauseOffscreen && !v.paused) { v.pause(); v.dataset.rbePausedOffscreen = '1'; }
-      else if (e.isIntersecting && v.dataset.rbePausedOffscreen && s.videoMode !== 'off') { delete v.dataset.rbePausedOffscreen; v.play().catch(() => {}); }
+      else if (e.isIntersecting && v.dataset.rbePausedOffscreen && s.videoMode !== 'off' && !away()) { delete v.dataset.rbePausedOffscreen; v.play().catch(() => {}); }
     }
   }, { threshold: 0.15 });
 
   function guard(v) {
     if (seen.has(v)) return;
     seen.add(v);
+    known.add(v);
     io.observe(v);
     v.addEventListener('play', () => {
       const s = RBE.settings;
+      if (away() && !gesture()) { v.pause(); return; }
       if (s.videoMode === 'off' && !gesture() && !v.dataset.rbeAllowed) v.pause();
       if (gesture()) v.dataset.rbeAllowed = '1';
     });

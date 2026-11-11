@@ -2,6 +2,7 @@
 // fixtures below, so it never touches live Reddit. Run: npm test (after npm run build).
 import { chromium, firefox } from 'playwright';
 import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
+import { awayChecks, awayOk } from './lib/away.mjs';
 import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
 
 const ext = path.resolve(process.argv[2] || 'dist/chrome');
@@ -285,11 +286,13 @@ if (r.us.built) {
   r.us.lightbox = await p2.evaluate(() => { const lb = document.querySelector('.rbe-lb'); return lb && { fixed: getComputedStyle(lb).position === 'fixed', full: lb.getBoundingClientRect().width === innerWidth, img: [...lb.querySelectorAll('img')].some(i => /one\.png$/.test(i.src)), count: lb.querySelector('.rbe-lb-count')?.textContent }; });
   await p2.keyboard.press('Escape');
   r.us.errors = usLogs;
+  r.us.away = await awayChecks(p2);
   await b2.close();
   r.us.cost = await churnCost({ browserType: bt, name: r.us.browser, launchOpts, route: { re: /reddit\.com|redd\.it|redditstatic/, fn: fixtures }, url: 'https://www.reddit.com/r/test/', usFile });
 }
 
 const checks = {
+  ...awayOk('userscript (' + (r.us.browser || '') + ')', r.us.away || {}),
   'theme style injected': r.themeStyle,
   'quick bar shown': r.quickbar,
   'nav gear placed': r.gear,

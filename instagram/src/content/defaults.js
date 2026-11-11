@@ -9,6 +9,7 @@ IGB.DEFAULTS = {
   nativeControls: true,       // browser controls on every post/reel video; hides Instagram's overlay
   videoLoop: true,
   videoPauseOffscreen: true,
+  videoPauseOnHide: true,     // pause when the tab is hidden or the window loses focus
   reelsAutoScroll: true,      // Reels tab: when a reel ends, scroll to the next one (like the phone app)
 
   notInterested: true,        // "Not interested" button on feed posts, reels and in the lightbox

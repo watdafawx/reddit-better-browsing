@@ -1,7 +1,7 @@
 {
   "name": "reddit-better-browsing",
-  "version": "1.3.10",
-  "userscriptRevision": 1,
+  "version": "1.3.11",
+  "userscriptRevision": 0,
   "private": true,
   "description": "Chrome + Firefox extension for the new Reddit layout",
   "license": "MIT",

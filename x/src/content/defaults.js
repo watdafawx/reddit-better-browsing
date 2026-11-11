@@ -9,6 +9,7 @@ XBB.DEFAULTS = {
   nativeControls: true,       // browser controls on every tweet video; hides X's own overlay
   videoOneAtATime: true,      // only one video plays: the one you started, else the one most in view
   videoPauseOffscreen: true,
+  videoPauseOnHide: true,     // pause when the tab is hidden or the window loses focus
   videoLoop: false,
 
   // Tweets
