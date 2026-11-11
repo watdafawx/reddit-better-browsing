@@ -1,6 +1,6 @@
 {
   "name": "reddit-better-browsing",
-  "version": "1.3.9",
+  "version": "1.3.10",
   "userscriptRevision": 0,
   "private": true,
   "description": "Chrome + Firefox extension for the new Reddit layout",
@@ -11,7 +11,8 @@
     "test": "node build.js --extensions && node test/offline.mjs dist/chrome",
     "test:instagram": "node build.js --extensions && node test/instagram-offline.mjs dist/instagram-chrome",
     "test:x": "node build.js && node test/x-offline.mjs",
-    "release:userscript": "gh release upload userscript dist/better-browsing.user.js --clobber"
+    "release:userscript": "gh release upload userscript dist/better-browsing.user.js --clobber",
+    "test:all": "node test/all.mjs"
   },
   "devDependencies": {
     "playwright": "1.49.1"

@@ -1,7 +1,8 @@
 // Offline smoke test for the Instagram extension: loads dist/instagram-chrome into Chromium and answers
 // every instagram.com / cdn request from fixtures below, so it never touches live Instagram.
 // Run: npm run test:instagram (after npm run build).
-import { chromium } from 'playwright';
+import { chromium, firefox } from 'playwright';
+import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
 import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
 
 const ext = path.resolve(process.argv[2] || 'dist/instagram-chrome');
@@ -484,7 +485,10 @@ try {
 // ---------- userscript build, no extension ----------
 const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
 if (fs.existsSync(usFile)) {
-  const b2 = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+  // BROWSER=firefox runs the userscript part in Firefox (the extension part above can only load in Chromium)
+  const FF = process.env.BROWSER === 'firefox', bt = FF ? firefox : chromium, bname = FF ? 'firefox' : 'chromium';
+  const launchOpts = FF ? { firefoxUserPrefs: { 'media.autoplay.default': 0 } } : { args: ['--autoplay-policy=no-user-gesture-required'] };
+  const b2 = await bt.launch(launchOpts);
   const c2 = await b2.newContext({ viewport: { width: 1400, height: 900 } });
   await c2.route(/instagram\.com|example\.test/, fixtures);
   await c2.addInitScript({ path: usFile });
@@ -492,6 +496,7 @@ if (fs.existsSync(usFile)) {
   p2.on('pageerror', e => logs.push('[userscript pageerror] ' + e.message));
   await p2.goto('https://www.instagram.com/');
   await p2.waitForTimeout(1500);
+  check('userscript: idle page, the script changes nothing on its own, no feedback loop (' + bname + ')', (await idleMutations(p2)) <= 10, await p2.evaluate(() => window.__idleMut));
   const us = await p2.evaluate(() => { const v = document.querySelector('#vid video'); return { controls: v.controls, muted: v.muted, volume: v.volume, css: !!document.getElementById('igb-css') }; });
   check('userscript: controls + sound', us.controls && !us.muted && Math.abs(us.volume - 0.4) < 0.01 && us.css, us);
   await p2.keyboard.press('Alt+W');
@@ -513,6 +518,8 @@ if (fs.existsSync(usFile)) {
   const attr2 = await p2.evaluate(() => document.documentElement.dataset.igbVideo);
   check('userscript: settings change applies live', /"mode":"muted"/.test(attr2), attr2);
   await b2.close();
+  const cost = await churnCost({ browserType: bt, name: bname, launchOpts, route: { re: /instagram\.com|example\.test/, fn: fixtures }, url: 'https://www.instagram.com/', usFile });
+  check('userscript: on a page that keeps changing, the script adds little work (' + bname + ')', costOk(bname, cost), cost);
 } else check('userscript: built', false, usFile + ' missing');
 
 let fails = 0;

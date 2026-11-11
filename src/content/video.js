@@ -51,12 +51,24 @@
     });
   }
 
+  // Browser controls on our own videos, or none: then a click plays/pauses (and does not reach the page behind)
+  function ownControls(v) {
+    const on = RBE.settings.nativeControls !== false;
+    v.controls = on;
+    if (!v._rbeToggle) {
+      v._rbeToggle = e => { if (v.controls) return; e.preventDefault(); e.stopPropagation(); if (v.paused) tryPlay(v); else v.pause(); };
+      v.addEventListener('click', v._rbeToggle);
+    }
+  }
+  RBE.onSettings(() => document.querySelectorAll('video[data-rbe-own]').forEach(ownControls));
+
   // For videos we create ourselves (viewer / lightbox)
   RBE.setupOwnVideo = function (v, { autoplay = true } = {}) {
     const s = RBE.settings;
     v.playsInline = true;
     v.loop = !!s.videoLoop;
-    v.controls = true;
+    v.dataset.rbeOwn = '1';
+    ownControls(v);
     const vol = Math.max(0, Math.min(1, (+s.videoVolume || 0) / 100));
     if (s.videoMode === 'muted') v.muted = true;
     else if (s.videoMode === 'volume' || s.videoMode === 'off') { v.volume = vol; v.muted = vol === 0; }

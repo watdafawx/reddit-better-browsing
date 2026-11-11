@@ -25,6 +25,7 @@ RBE.DEFAULTS = {
   videoVolume: 10,             // 0-100
   videoPauseOffscreen: true,
   videoLoop: true,
+  nativeControls: true,        // browser controls on the viewer and lightbox videos; off: click the video to play/pause
 
   // Spoilers / blur
   revealSpoilers: false,
