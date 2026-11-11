@@ -3,6 +3,7 @@
 // Run: npm run test:instagram (after npm run build).
 import { chromium, firefox } from 'playwright';
 import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
+import { awayChecks, awayOk } from './lib/away.mjs';
 import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
 
 const ext = path.resolve(process.argv[2] || 'dist/instagram-chrome');
@@ -439,7 +440,7 @@ let frame = null;
 for (let i = 0; i < 30 && !frame; i++) { frame = page.frames().find(f => f.url().endsWith('/popup/popup.html')); if (!frame) await page.waitForTimeout(100); }
 if (frame) await frame.waitForSelector('[data-key="settingsGear"]', { timeout: 3000 }).catch(() => {});
 const fInputs = frame ? await frame.locator('[data-key]').count() : 0;
-check('gear opens settings panel (popup in iframe)', fInputs === 17 && page.url().endsWith('/'), { fInputs, url: page.url() });
+check('gear opens settings panel (popup in iframe)', fInputs === 18 && page.url().endsWith('/'), { fInputs, url: page.url() });
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 const escP = await page.$('.igb-settings');
@@ -502,7 +503,7 @@ if (fs.existsSync(usFile)) {
   await p2.keyboard.press('Alt+W');
   await p2.waitForTimeout(300);
   const panel = await p2.evaluate(() => { const r = document.querySelector('.igb-settings')?.shadowRoot; return { inputs: r?.querySelectorAll('[data-key]').length, vol: r?.querySelector('[data-key="videoVolume"]')?.value }; });
-  check('userscript: Alt+W settings panel', panel.inputs === 17 && panel.vol === '40', panel);
+  check('userscript: Alt+W settings panel', panel.inputs === 18 && panel.vol === '40', panel);
   // real clicks inside the panel (shadow DOM) must not close it; a click on the backdrop does
   await p2.locator('.igb-settings [data-key="videoLoop"]').click().catch(() => {});
   await p2.waitForTimeout(300);
@@ -517,6 +518,7 @@ if (fs.existsSync(usFile)) {
   await p2.waitForTimeout(400);
   const attr2 = await p2.evaluate(() => document.documentElement.dataset.igbVideo);
   check('userscript: settings change applies live', /"mode":"muted"/.test(attr2), attr2);
+  for (const [k, v] of Object.entries(awayOk('userscript (' + bname + ')', await awayChecks(p2)))) check(k, v, null);
   await b2.close();
   const cost = await churnCost({ browserType: bt, name: bname, launchOpts, route: { re: /instagram\.com|example\.test/, fn: fixtures }, url: 'https://www.instagram.com/', usFile });
   check('userscript: on a page that keeps changing, the script adds little work (' + bname + ')', costOk(bname, cost), cost);

@@ -24,6 +24,7 @@ RBE.DEFAULTS = {
   videoMode: 'volume',         // default | volume | muted | off
   videoVolume: 10,             // 0-100
   videoPauseOffscreen: true,
+  videoPauseOnHide: true,      // pause when the tab is hidden or the window loses focus
   videoLoop: true,
   nativeControls: true,        // browser controls on the viewer and lightbox videos; off: click the video to play/pause
 

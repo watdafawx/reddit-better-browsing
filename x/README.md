@@ -5,6 +5,7 @@ Part of the one userscript (`dist/better-browsing.user.js`) for x.com. There is 
 ## Features
 
 - **Browser video controls on every tweet video** (seek bar, volume, fullscreen, speed, picture-in-picture). X's own overlay (play button, mute button) is invisible and click-through; clicks on the controls don't open the tweet. GIFs are left to X.
+- **Pauses when you leave.** When the tab is hidden or the window loses focus, playing videos pause and nothing starts meanwhile; back again, the same rules pick the video that plays (optional).
 - **One video plays at a time.** The video you start wins until it scrolls away; otherwise the one nearest the middle of the screen plays (among videos at least half in view; the current one keeps it until another is clearly more central). Pause a video yourself and it stays paused, and nothing else starts in its place while it is on screen, so a tweet with several videos (or a quote tweet with its own) no longer fights over which one plays. Scrolled out of view, videos pause (optional).
 - **Sound on by default** at your volume (40% to start). Browsers only allow sound after a click or key press on the page; until then videos play muted and unmute on the first one. X mutes videos on its own; those page-made mutes are ignored. Volume you set with the controls carries to the next videos until the page reloads. Modes: play with sound, always muted, no autoplay, or hands off.
 - **One-click retweet**: Retweet and Undo repost skip the menu. <kbd>Shift</kbd>+click shows it (for Quote).

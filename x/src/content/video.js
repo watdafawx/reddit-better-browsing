@@ -60,6 +60,16 @@
   const quiet = v => { v._xbbQuiet = performance.now(); v.pause(); };   // a pause that is ours, not yours
   const isPip = v => document.pictureInPictureElement === v;
 
+  // ---------- tab hidden / window unfocused: pause, and let nothing start meanwhile ----------
+  let blurred = false;
+  const away = () => !!XBB.settings.videoPauseOnHide && (document.hidden || blurred);
+  const pauseAway = () => {
+    if (!away()) return;
+    for (const v of score.keys()) if (v.isConnected && managed(v) && !v.paused && !isPip(v)) quiet(v);   // ours, not yours: it resumes when you are back
+  };
+  addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
+  addEventListener('focus', () => { blurred = false; schedule(0); });
+
   function start(v) {
     if (failed.has(v)) return;
     // main-world.js's play() handles sound before the first click (starts muted, unmutes on the click)
@@ -104,7 +114,7 @@
     setPick(best);
 
     if (s.videoOneAtATime) for (const v of list) if (v !== best && !v.paused && !isPip(v)) quiet(v);
-    if (s.videoMode === 'off' || hush) return;
+    if (s.videoMode === 'off' || hush || away()) return;
     // autoplay: the pick; without one-at-a-time, every video that is well in view
     const targets = s.videoOneAtATime ? (best ? [best] : []) : list.filter(v => sc(v) >= 0.5);
     for (const v of targets) if (v.paused && !v.ended && !userPaused.has(v)) start(v);
@@ -116,6 +126,7 @@
   document.addEventListener('play', e => {
     const v = e.target, s = XBB.settings;
     if (!managed(v)) return;
+    if (away() && !userOn(v)) { quiet(v); return; }   // X restarting something while you are away
     if (userOn(v)) {                       // you started it: it wins, and everything else yields
       userPaused.delete(v);
       chosen = v;
@@ -165,7 +176,7 @@
     if (now - lastRun > 150) { lastRun = now; evaluate(); }
     schedule(150);                       // and once more when it settles
   }, { passive: true, capture: true });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseAway(); else schedule(); });
   XBB.onSettings(s => {
     root.dataset.xbbVideo = JSON.stringify({ mode: s.videoMode, volume: +s.videoVolume || 0, one: !!s.videoOneAtATime });
     root.classList.toggle('xbb-native', !!s.nativeControls);

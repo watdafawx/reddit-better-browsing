@@ -223,7 +223,7 @@ const click = async (page, sel) => { const b = await page.locator(sel).boundingB
   await page.click('nav .xbb-gear');
   await page.waitForTimeout(300);
   const panel = await page.evaluate(() => { const x = document.querySelector('.xbb-settings')?.shadowRoot; return { inputs: x?.querySelectorAll('[data-key]').length, vol: x?.querySelector('[data-key="videoVolume"]')?.value, host: x?.querySelector('[data-key="embedHost"]')?.value }; });
-  check('gear opens the settings panel', panel.inputs === 12 && panel.vol === '40' && panel.host === 'vxtwitter.com', panel);
+  check('gear opens the settings panel', panel.inputs === 13 && panel.vol === '40' && panel.host === 'vxtwitter.com', panel);
   await page.locator('.xbb-settings [data-key="videoLoop"]').click();
   await page.waitForTimeout(300);
   check('clicks inside the panel keep it open and save', await page.evaluate(() => !!document.querySelector('.xbb-settings') && JSON.parse(localStorage.getItem('xbb-userscript-settings')).settings.videoLoop === true), null);
@@ -313,6 +313,39 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
   check('feed, X autoplaying by itself: no video starts and stops again while it is well in view', flick.length === 0, flick);
   check('feed, X autoplaying by itself: one video plays when scrolling stops', run.length === 1, run);
   await ctx.close();
+}
+
+// ---------- tab hidden / window unfocused ----------
+{
+  // pretend: a hidden tab (document.hidden + visibilitychange) or a window without focus (hasFocus + blur/focus)
+  const away = (page, kind, on) => page.evaluate(([kind, on]) => {
+    if (kind === 'hidden') { Object.defineProperty(document, 'hidden', { configurable: true, get: () => on }); document.dispatchEvent(new Event('visibilitychange')); }
+    else { document.hasFocus = () => !on; window.dispatchEvent(new Event(on ? 'blur' : 'focus')); }
+  }, [kind, on]);
+  const run = page => page.evaluate(() => [...document.querySelectorAll('video')].filter(v => !v.paused).map(v => v.id));
+  for (const kind of ['hidden', 'blur']) {
+    const { ctx, page } = await open(null, '/feed', 700);
+    await page.waitForTimeout(1500);
+    check(`${kind === 'hidden' ? 'tab hidden' : 'window unfocused'}: a video plays to begin with`, (await run(page)).length === 1, await run(page));
+    await away(page, kind, true);
+    await page.waitForTimeout(700);
+    check(`${kind === 'hidden' ? 'tab hidden' : 'window unfocused'}: the playing video pauses`, (await run(page)).length === 0, await run(page));
+    for (let i = 0; i < 20; i++) { await page.mouse.wheel(0, 40); await page.waitForTimeout(40); }
+    await page.waitForTimeout(800);
+    check(`${kind === 'hidden' ? 'tab hidden' : 'window unfocused'}: scrolling meanwhile starts nothing`, (await run(page)).length === 0, await run(page));
+    await away(page, kind, false);
+    await page.waitForTimeout(1500);
+    check(`${kind === 'hidden' ? 'tab hidden' : 'window unfocused'}: back again, one video plays`, (await run(page)).length === 1, await run(page));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ videoPauseOnHide: false }, '/feed', 700);
+    await page.waitForTimeout(1500);
+    await away(page, 'hidden', true); await away(page, 'blur', true);
+    await page.waitForTimeout(700);
+    check('pause-on-hide off: the video keeps playing', (await run(page)).length === 1, await run(page));
+    await ctx.close();
+  }
 }
 
 // ---------- X keeps replaying the videos we stop: no tug of war ----------
