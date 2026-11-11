@@ -1,6 +1,7 @@
 // Offline smoke test: loads dist/chrome into Chromium and answers every reddit.com request from
 // fixtures below, so it never touches live Reddit. Run: npm test (after npm run build).
-import { chromium } from 'playwright';
+import { chromium, firefox } from 'playwright';
+import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
 import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
 
 const ext = path.resolve(process.argv[2] || 'dist/chrome');
@@ -133,7 +134,15 @@ const v = await page.locator('shreddit-post#t3_vvv').boundingBox();
 await page.mouse.click(v.x + 200, v.y + 100);
 await page.waitForSelector('.rbe-viewer video', { timeout: 10000 });
 await page.waitForTimeout(2500);
-r.video = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'); return { src: (el.currentSrc || el.getAttribute('src') || '').slice(0, 30), vol: el.volume, muted: el.muted }; });
+r.video = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'); return { src: (el.currentSrc || el.getAttribute('src') || '').slice(0, 30), vol: el.volume, muted: el.muted, controls: el.controls }; });
+// the controls toggle applies live; with it off a click plays/pauses
+const setNative = on => sw.evaluate(on => chrome.storage.sync.get('settings').then(({ settings = {} }) => chrome.storage.sync.set({ settings: { ...settings, nativeControls: on } })), on);
+await setNative(false);
+await page.waitForTimeout(500);
+r.nativeOff = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'), e = new MouseEvent('click', { bubbles: true, cancelable: true }); el.dispatchEvent(e); return { controls: el.controls, handled: e.defaultPrevented }; });   // our click-to-toggle took it
+await setNative(true);
+await page.waitForTimeout(500);
+r.nativeOn = await page.evaluate(() => document.querySelector('.rbe-viewer video').controls);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 
@@ -217,7 +226,11 @@ fs.rmSync(prof, { recursive: true, force: true });
 const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
 r.us = { built: fs.existsSync(usFile) };
 if (r.us.built) {
-  const b2 = await chromium.launch();
+  // BROWSER=firefox runs the userscript part in Firefox (the extension part above can only load in Chromium)
+  const FF = process.env.BROWSER === 'firefox', bt = FF ? firefox : chromium;
+  const launchOpts = FF ? { firefoxUserPrefs: { 'media.autoplay.default': 0 } } : {};
+  r.us.browser = FF ? 'firefox' : 'chromium';
+  const b2 = await bt.launch(launchOpts);
   const c2 = await b2.newContext({ viewport: { width: 1400, height: 900 } });
   await c2.route(/reddit\.com|redd\.it|redditstatic/, fixtures);
   await c2.addInitScript({ path: usFile });
@@ -227,6 +240,7 @@ if (r.us.built) {
   p2.on('dialog', d => { usLogs.push('dialog ' + d.message()); d.dismiss(); });
   await p2.goto('https://www.reddit.com/r/test/');
   await p2.waitForTimeout(1500);
+  r.us.idle = await idleMutations(p2);
   Object.assign(r.us, await p2.evaluate(() => ({
     theme: !!document.getElementById('rbe-theme'), css: !!document.getElementById('rbe-css'),
     quickbar: !!document.getElementById('rbe-qb'), gear: !!document.querySelector('.rbe-nav-gear'),
@@ -272,6 +286,7 @@ if (r.us.built) {
   await p2.keyboard.press('Escape');
   r.us.errors = usLogs;
   await b2.close();
+  r.us.cost = await churnCost({ browserType: bt, name: r.us.browser, launchOpts, route: { re: /reddit\.com|redd\.it|redditstatic/, fn: fixtures }, url: 'https://www.reddit.com/r/test/', usFile });
 }
 
 const checks = {
@@ -291,6 +306,9 @@ const checks = {
   'Esc closes viewer': r.closed,
   'reopen uses cache': r.reopenReqs === 0,
   'video gets volume setting': r.video.vol === 0.1,
+  ['userscript: idle page, the script changes nothing on its own, no feedback loop (' + r.us.browser + ')']: r.us.idle <= 10,
+  ['userscript: on a page that keeps changing, the script adds little work (' + r.us.browser + ')']: costOk(r.us.browser, r.us.cost),
+  'viewer video has browser controls; the setting turns them off (click toggles play) and on again, live': r.video.controls === true && r.nativeOff.controls === false && r.nativeOff.handled && r.nativeOn === true,
   'page mute after a click elsewhere ignored': r.audio.afterElsewhere === false,
   'mute after a click on the player sticks': r.audio.afterOwn === true && r.audio.user === '1',
   'click on the post, not the player, never mutes it': r.audioScope.ignored && r.audioScope.tagged === null && r.audioScope.muted === false && Math.abs(r.audioScope.vol - 0.1) < 0.01,

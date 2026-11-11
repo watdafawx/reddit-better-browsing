@@ -42,7 +42,7 @@ and click **Install**. That one script runs Reddit Better Browsing on reddit.com
 | **No page switching** | Clicking a post opens it with its comments in a **side panel**, a **modal**, or **inline** in the feed (pick in settings). Threads collapse, "load more" works, you can change the comment sort, and post links inside the viewer open in the viewer too (← goes back). Ctrl/⌘/middle-click still opens a new tab. |
 | **Fast opening** | When the pointer rests on a post, its comments start loading in the background, so the viewer usually opens instantly. |
 | **Image viewer** | Replaces Reddit's fullscreen viewer. The mouse wheel goes to the next or previous image, and past the last image of a gallery it continues into the next posts (optional). Click the image to zoom, drag to pan, `Ctrl`+wheel to zoom. A "vertical strip" style is available if you'd rather scroll. |
-| **Video** | Autoplay with sound at X% (default 10%), autoplay muted, or no autoplay. Can pause videos scrolled out of view. |
+| **Video** | Autoplay with sound at X% (default 10%), autoplay muted, or no autoplay. Can pause videos scrolled out of view. The viewer and lightbox use the browser's video controls (seek bar, volume, fullscreen); turn that off to play and pause with a click instead. |
 | **Spoilers** | Auto-reveal all spoilers, or reveal everything on the page once. |
 | **NSFW** | Reddit default, show, blur or hide. |
 | **Accounts** | Log in once per account and click "Save current account". After that, switching is one click. |

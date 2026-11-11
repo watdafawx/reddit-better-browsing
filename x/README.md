@@ -27,3 +27,7 @@ Not carried over from the old optimizer script: timer and animation-frame thrott
 ## Test
 
 `npm run test:x` builds the userscript and loads it into plain Chromium against fixtures in `test/x-offline.mjs` (a small clip, `test/fixtures/clip.webm`, plays in them). It never contacts x.com. What it can't cover: X's real markup, which changes; after changing selectors in `video.js`, `tweet.js` or `settings.js`, check by hand on x.com.
+
+## Firefox
+
+Tested in Firefox as well as Chromium (`BROWSER=firefox node test/x-offline.mjs`). Firefox does not show the page clicks on a video's own controls, so a play or pause of yours is recognised by the pointer resting on that video plus the page's user activation (see `video.js`). Which video plays is measured from the video's position when it is needed (not from the observer's last report), and again while you scroll (at most every 150 ms), so the one nearest the middle plays right away.

@@ -20,12 +20,12 @@
   const gesture = () => Date.now() - lastGesture < 1200;
   // A recent click/key on this video's own player (the video, its controls). Clicking elsewhere on the
   // page is a gesture too, but X's mute/pause right after it is not the user's choice.
-  const userOn = el => {
-    if (!gesture() || !lastTarget) return false;
-    if (lastTarget === el) return true;
-    const p = el.closest(PLAYER);
-    return !!p && p.contains(lastTarget);
-  };
+  // Firefox never shows the page a click on a video's own controls, only the pointer resting on it and the
+  // page's user activation: that counts as the user's too.
+  let hover = null;
+  ['mousemove', 'pointerover', 'mouseover'].forEach(t => window.addEventListener(t, e => { hover = e.target; }, { capture: true, passive: true }));
+  const on = (el, t) => { if (!t) return false; if (t === el) return true; const p = el.closest(PLAYER); return !!p && p.contains(t); };
+  const userOn = el => (gesture() && on(el, lastTarget)) || (!!navigator.userActivation?.isActive && on(el, hover));
 
   // Parse the settings attribute only when it changes
   let cfg = {};
@@ -55,7 +55,7 @@
       waiting.delete(v);
     }
   };
-  ['pointerdown', 'keydown', 'touchstart'].forEach(t => window.addEventListener(t, onGesture, true));
+  ['pointerdown', 'keydown', 'touchstart', 'focusin'].forEach(t => window.addEventListener(t, onGesture, true));
 
   function applyAudio(el) {
     if (el.dataset.xbbUserAudio) return;
@@ -68,12 +68,14 @@
 
   // With one-at-a-time (or autoplay off), only the picked video, or one the user just started, may play.
   const gated = el => cfg.mode === 'off' || cfg.one;
-  const mayPlay = el => gesture() || el.hasAttribute('data-xbb-pick') || el.dataset.xbbAllowed;
+  // Only the pick, or a video you just clicked yourself. Not "any video, for a while after any click": X
+  // calls play() on its other videos after a key press or click, and once they were let through they were
+  // let through for good, so X and our own pausing took turns in a tight loop (CPU spikes).
+  const mayPlay = el => el.hasAttribute('data-xbb-pick') || userOn(el);
 
   P.play = function () {
     if (!active(this)) return origPlay.apply(this, arguments);
     if (gated(this) && !mayPlay(this)) return Promise.resolve();   // swallow X's autoplay
-    if (gesture()) this.dataset.xbbAllowed = '1';
     applyAudio(this);
     const el = this;
     return origPlay.call(this).catch(err => {

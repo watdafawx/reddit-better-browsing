@@ -1,8 +1,9 @@
 // Offline smoke test for the X part of the userscript: loads dist/better-browsing.user.js into plain Chromium
 // (no extension) and answers every x.com request from fixtures below, so it never touches live X.
 // Run: npm run test:x
-import { chromium } from 'playwright';
+import { chromium, firefox } from 'playwright';
 import path from 'path'; import fs from 'fs';
+import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
 
 const usFile = path.resolve(process.argv[2] || 'dist/better-browsing.user.js');
 const CLIP = fs.readFileSync(path.resolve('test/fixtures/clip.webm'));
@@ -67,7 +68,8 @@ const gap = h => '<div style="height:' + h + 'px"></div>';
 const feed = withMain([1, 2, 3, 4, 5].map(n => tweet('ft' + n, 'u' + n, '50' + n, player('f' + n)) + gap(120)).join('') + gap(900));
 const cell = id => player(id, 240, 135).replace('position:relative;', 'position:relative;float:left;');
 const multi = withMain(gap(40) + tweet('m', 'multi', '600', '<div style="width:480px;height:270px">' + ['m1', 'm2', 'm3', 'm4'].map(cell).join('') + '</div>') + gap(1400));
-const pages = { '/feed': feed, '/multi': multi };
+const heavy = withMain(Array.from({ length: 80 }, (_, n) => tweet('h' + n, 'u' + n, '70' + n, '<div style="width:480px">tweet text ' + n + '</div>') + gap(30)).join(''));
+const pages = { '/feed': feed, '/multi': multi, '/heavy': heavy };
 
 const fixtures = route => {
   const u = new URL(route.request().url());
@@ -82,13 +84,15 @@ const fixtures = route => {
 };
 
 // ---------- harness ----------
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const FF = process.env.BROWSER === 'firefox';
+const launchOpts = FF ? { firefoxUserPrefs: process.env.FFDEFAULT ? {} : { 'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0 } } : { args: ['--autoplay-policy=no-user-gesture-required'] };
+const browser = await (FF ? firefox : chromium).launch(launchOpts);
 const logs = [], ok = {}, r = {};
 const check = (name, cond, detail) => { ok[name] = !!cond; r[name] = detail; };
 async function open(seed, urlPath = '/home', height = 900) {
   const ctx = await browser.newContext({ viewport: { width: 1400, height } });
   await ctx.route(/x\.com|example\.test/, fixtures);
-  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'https://x.com' });
+  if (!FF) await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'https://x.com' });
   await ctx.addInitScript(seed ? `localStorage.setItem('xbb-userscript-settings', ${JSON.stringify(JSON.stringify({ settings: seed }))});` : '');
   await ctx.addInitScript({ path: usFile });
   const page = await ctx.newPage();
@@ -288,6 +292,48 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
   await ctx.close();
 }
 
+// ---------- X starts videos by itself while you scroll: no start-then-stop flicker ----------
+{
+  const { ctx, page } = await open(null, '/feed', 700);
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {   // X-like autoplay: plays a video once 60% of it is in view, pauses it below that
+    const io = new IntersectionObserver(es => es.forEach(e => { const v = e.target; if (e.intersectionRatio >= 0.6) { v.muted = true; v.play().catch(() => {}); } else if (!v.paused) v.pause(); }), { threshold: [0, 0.3, 0.6, 1] });
+    document.querySelectorAll('video').forEach(v => io.observe(v));
+    window.__flick = []; const t = {};
+    for (const v of document.querySelectorAll('video')) {
+      v.addEventListener('play', () => { t[v.id] = performance.now(); });
+      v.addEventListener('pause', () => { const r = v.getBoundingClientRect(), vis = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / r.height;
+        if (t[v.id] && performance.now() - t[v.id] < 600 && vis >= 0.6) window.__flick.push(v.id + ' stopped ' + Math.round(performance.now() - t[v.id]) + 'ms after starting at ' + Math.round(vis * 100) + '% in view'); });
+    }
+  });
+  for (let i = 0; i < 40; i++) { await page.mouse.wheel(0, 30); await page.waitForTimeout(50); }
+  await page.waitForTimeout(1200);
+  const flick = await page.evaluate(() => window.__flick);
+  const run = await page.evaluate(() => [...document.querySelectorAll('video')].filter(v => !v.paused).map(v => v.id));
+  check('feed, X autoplaying by itself: no video starts and stops again while it is well in view', flick.length === 0, flick);
+  check('feed, X autoplaying by itself: one video plays when scrolling stops', run.length === 1, run);
+  await ctx.close();
+}
+
+// ---------- X keeps replaying the videos we stop: no tug of war ----------
+{
+  const { ctx, page } = await open(null, '/feed', 700);
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {   // X-like player: plays every video on a key press, and again whenever one is paused
+    window.__plays = 0;
+    for (const v of document.querySelectorAll('video')) { v.addEventListener('play', () => window.__plays++); v.addEventListener('pause', () => { if (!v.ended) setTimeout(() => { v.muted = true; v.play().catch(() => {}); }, 0); }); }
+    addEventListener('keydown', () => { for (const v of document.querySelectorAll('video')) { v.muted = true; v.play().catch(() => {}); } });
+  });
+  await page.keyboard.press('j');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { window.__plays = 0; });
+  await page.waitForTimeout(3000);
+  const n = await page.evaluate(() => window.__plays);
+  const run = await page.evaluate(() => [...document.querySelectorAll('video')].filter(v => !v.paused).map(v => v.id));
+  check('X replaying every stopped video: no play/pause tug of war (few play events, one video)', n < 20 && run.length === 1, { plays: n, run });
+  await ctx.close();
+}
+
 // ---------- a tweet with several videos: they play one after another ----------
 {
   const ids = ['m1', 'm2', 'm3', 'm4'];
@@ -354,6 +400,18 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
   const g = await geo(page, ids);
   check('multi, one-at-a-time off: all four play', g.every(v => v.playing), g);
   await ctx.close();
+}
+
+// ---------- CPU: nothing runs away ----------
+{
+  const name = FF ? 'firefox' : 'chromium';
+  const { ctx, page } = await open(null, '/heavy', 900);
+  await page.waitForTimeout(2500);
+  const idle = await idleMutations(page);
+  check('CPU: on an idle page the script changes nothing on its own (no feedback loop)', idle <= 10, idle);
+  await ctx.close();
+  const c = await churnCost({ browserType: FF ? firefox : chromium, name, launchOpts, route: { re: /x.com|example.test/, fn: fixtures }, url: 'https://x.com/heavy', usFile });
+  check('CPU: on a page that keeps changing, the script adds little work (' + name + ')', costOk(name, c), c);
 }
 
 let fails = 0;

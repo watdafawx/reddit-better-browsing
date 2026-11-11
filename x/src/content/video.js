@@ -10,7 +10,7 @@
   const isGif = v => v.hasAttribute('data-xbb-gif') || /\/tweet_video\//.test(v.currentSrc || v.src || '');
   const managed = v => v instanceof HTMLVideoElement && !ours(v) && !!v.closest(PLAYER) && !isGif(v);
 
-  const score = new Map();         // video -> how much of it is on screen (0..1, vertical)
+  const score = new Map();         // the videos we watch (the observer only wakes us up; see sc())
   const userPaused = new WeakSet();
   const failed = new WeakSet();
   let pick = null;                 // the video that should be playing
@@ -19,13 +19,14 @@
   // ---------- user gestures (to tell your clicks from X's own play/pause calls) ----------
   let lastGesture = 0, lastTarget = null;
   const onGesture = e => { lastGesture = Date.now(); lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target; };
-  ['pointerdown', 'keydown', 'touchstart'].forEach(t => addEventListener(t, onGesture, true));
-  const userOn = v => {
-    if (Date.now() - lastGesture > 1500 || !lastTarget) return false;
-    if (lastTarget === v) return true;
-    const p = v.closest(PLAYER);
-    return !!p && p.contains(lastTarget);
-  };
+  ['pointerdown', 'keydown', 'touchstart', 'focusin'].forEach(t => addEventListener(t, onGesture, true));
+  // Firefox never shows the page a click on a video's own controls (no pointerdown/click), only that the
+  // pointer is over it and that the page got user activation. So a play/pause while the pointer rests on
+  // this video and the page has user activation counts as yours too.
+  let hover = null;
+  ['mousemove', 'pointerover', 'mouseover'].forEach(t => addEventListener(t, e => { hover = e.target; }, { capture: true, passive: true }));
+  const on = (v, t) => { if (!t) return false; if (t === v) return true; const p = v.closest(PLAYER); return !!p && p.contains(t); };
+  const userOn = v => (Date.now() - lastGesture <= 1500 && on(v, lastTarget)) || (!!navigator.userActivation?.isActive && on(v, hover));
 
   // ---------- native controls ----------
   function prep(v) {
@@ -47,7 +48,15 @@
   }
 
   // ---------- picking ----------
-  const sc = v => score.get(v) || 0;
+  // How much of the video is on screen (0..1), measured now: the observer only reports at a few thresholds,
+  // and in Firefox it lags a scroll, which made the pick jump around near the edges.
+  const sc = v => {
+    const r = v.getBoundingClientRect();
+    if (!r.height || !r.width) return 0;
+    const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0);
+    const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+    return w <= 0 || h <= 0 ? 0 : h / Math.min(r.height, innerHeight);
+  };
   const quiet = v => { v._xbbQuiet = performance.now(); v.pause(); };   // a pause that is ours, not yours
   const isPip = v => document.pictureInPictureElement === v;
 
@@ -113,8 +122,10 @@
       setPick(v);
       if (s.videoOneAtATime) for (const o of [...score.keys()]) if (o !== v && !o.paused && managed(o)) quiet(o);
     } else if (s.videoOneAtATime && s.videoMode !== 'default' && v !== pick) {
-      quiet(v);                            // X started a second one on its own: not allowed
-      schedule(0);
+      // X started one on its own. It may well be the one that should play (a scroll just moved it to the
+      // middle): pick again with the current positions first; stopping it only if it still is not the pick.
+      evaluate();
+      if (v !== pick && !v.paused) quiet(v);
     }
   }, true);
   document.addEventListener('pause', e => {
@@ -148,7 +159,12 @@
     });
   }
   XBB.onDomChange(scan, 200);
-  addEventListener('scroll', () => schedule(200), { passive: true, capture: true });
+  let lastRun = 0;
+  addEventListener('scroll', () => {
+    const now = performance.now();
+    if (now - lastRun > 150) { lastRun = now; evaluate(); }
+    schedule(150);                       // and once more when it settles
+  }, { passive: true, capture: true });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
   XBB.onSettings(s => {
     root.dataset.xbbVideo = JSON.stringify({ mode: s.videoMode, volume: +s.videoVolume || 0, one: !!s.videoOneAtATime });
