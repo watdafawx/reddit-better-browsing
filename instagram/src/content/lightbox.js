@@ -249,6 +249,7 @@
   let feedTimer = 0;
   addEventListener('click', e => {
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || lb) return;
+    if (IGB.dragging()) return;   // a carousel swipe still fires a click where it's released
     const t = e.target;
     if (!(t instanceof Element) || t.closest('.igb-root')) return;
     const s = IGB.settings;

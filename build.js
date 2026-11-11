@@ -1,11 +1,12 @@
-// node build.js  ->  dist/chrome, dist/firefox (Reddit), dist/instagram-chrome, dist/instagram-firefox, dist/better-browsing.user.js,
-// and a zip of each (no dependencies, Node 22+)
-const fs = require('fs'), path = require('path'), zlib = require('zlib');
+// node build.js  ->  dist/better-browsing.user.js: ONE userscript for Reddit, Instagram and X (no dependencies, Node 22+).
+// node build.js --extensions  ->  also dist/chrome, dist/firefox (Reddit), dist/instagram-*, loadable unpacked.
+// The extensions are not released; the Playwright tests (npm test, npm run test:instagram) load them.
+const fs = require('fs'), path = require('path');
 
-// Each extension: its source folder, base manifest, zip name, Firefox id, and whether it has a background script.
+// Each extension: its source folder, base manifest, Firefox id, and whether it has a background script.
 const extensions = [
-  { src: 'src', manifest: 'manifest.base.json', out: '', zip: 'reddit-better-browsing', gecko: 'reddit-better-browsing@local', background: true },
-  { src: 'instagram/src', manifest: 'instagram/manifest.base.json', out: 'instagram-', zip: 'instagram-better-browsing', gecko: 'instagram-better-browsing@local', background: false }
+  { src: 'src', manifest: 'manifest.base.json', out: '', gecko: 'reddit-better-browsing@local', background: true },
+  { src: 'instagram/src', manifest: 'instagram/manifest.base.json', out: 'instagram-', gecko: 'instagram-better-browsing@local', background: false }
 ];
 const targets = {
   chrome: (m, e) => e.background ? { ...m, background: { service_worker: 'background.js' } } : m,
@@ -13,46 +14,19 @@ const targets = {
     browser_specific_settings: { gecko: { id: e.gecko, strict_min_version: '128.0' } } })
 };
 
-// Minimal zip writer (deflate), forward-slash paths as Firefox requires.
-function zipDir(dir, outFile) {
-  const files = [];
-  const walk = d => fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
-    .forEach(e => { const p = path.join(d, e.name); e.isDirectory() ? walk(p) : files.push(p); });
-  walk(dir);
-  const local = [], central = [];
-  let offset = 0;
-  for (const f of files) {
-    const name = Buffer.from(path.relative(dir, f).split(path.sep).join('/'));
-    const data = fs.readFileSync(f), comp = zlib.deflateRawSync(data), crc = zlib.crc32(data);
-    const h = Buffer.alloc(30);
-    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(8, 8);
-    h.writeUInt32LE(crc, 14); h.writeUInt32LE(comp.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(name.length, 26);
-    const c = Buffer.alloc(46);
-    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(8, 10);
-    c.writeUInt32LE(crc, 16); c.writeUInt32LE(comp.length, 20); c.writeUInt32LE(data.length, 24); c.writeUInt16LE(name.length, 28);
-    c.writeUInt32LE(offset, 42);
-    local.push(h, name, comp); central.push(c, name);
-    offset += 30 + name.length + comp.length;
-  }
-  const cd = Buffer.concat(central), end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10);
-  end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
-  fs.writeFileSync(outFile, Buffer.concat([...local, cd, end]));
-}
-
 fs.rmSync('dist', { recursive: true, force: true });
-for (const e of extensions) {
+if (process.argv.includes('--extensions')) for (const e of extensions) {
   const base = JSON.parse(fs.readFileSync(e.manifest, 'utf8'));
   for (const [name, fn] of Object.entries(targets)) {
     const out = path.join('dist', e.out + name);
     fs.cpSync(e.src, out, { recursive: true });
     fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(fn(base, e), null, 2) + '\n');
-    zipDir(out, path.join('dist', `${e.zip}-${name}.zip`));
-    console.log('built', out, '+ zip');
+    console.log('built', out);
   }
 }
+fs.mkdirSync('dist', { recursive: true });
 
-// One userscript for both sites (Tampermonkey / Violentmonkey): dist/better-browsing.user.js.
+// One userscript for all three sites (Tampermonkey / Violentmonkey): dist/better-browsing.user.js.
 // It runs in the page itself (@grant none) at document-start, so the audio patches are in place
 // before Reddit's and Instagram's players load. Each site's part is its content scripts in manifest
 // order, with a shim for the extension APIs right after defaults.js, and its popup form in a panel.
@@ -60,7 +34,7 @@ for (const e of extensions) {
 const UPDATE_URL = 'https://github.com/watdafawx/reddit-better-browsing/releases/download/userscript/better-browsing.user.js';
 {
   const read = f => fs.readFileSync(f, 'utf8');
-  const rMan = JSON.parse(read('manifest.base.json')), igMan = JSON.parse(read('instagram/manifest.base.json'));
+  const rMan = JSON.parse(read('manifest.base.json')), igMan = JSON.parse(read('instagram/manifest.base.json')), xMan = JSON.parse(read('x/manifest.base.json'));
   // [main-world files, content files] from a manifest, as paths under srcDir
   const scripts = (man, srcDir) => {
     const cs = man.content_scripts;
@@ -105,18 +79,28 @@ const PANEL_CSS = ${JSON.stringify(igPanel.css)};
 ${join([...igMain, ...withShim(igContent, 'instagram/userscript/shim.js'), 'instagram/src/popup/popup.js', 'instagram/userscript/panel.js'])}
 ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
 
-  // Version goes up whenever either extension's does (Tampermonkey compares it part by part). The last
+  // X (Twitter)
+  const [xMain, xContent] = scripts(xMan, 'x/src');
+  const xPanel = panel('x/src');
+  const xsite = `
+const XBB_PANEL_HTML = ${JSON.stringify(xPanel.html)};
+const XBB_PANEL_CSS = ${JSON.stringify(xPanel.css)};
+${join([...xMain, ...withShim(xContent, 'x/userscript/shim.js'), 'x/src/popup/popup.js', 'x/userscript/panel.js'])}
+${style('xbb-css', cssFiles(xMan, 'x/src'))}`;
+
+  // Version goes up whenever any extension's does (Tampermonkey compares it part by part). The last
   // part, userscriptRevision in package.json, is for changes to the script alone (header, icon):
   // bump it for those, set it back to 0 when either extension's version changes.
   const rev = JSON.parse(read('package.json')).userscriptRevision || 0;
-  const version = `${rMan.version}.${igMan.version}.${rev}`;
+  const version = `${rMan.version}.${igMan.version}.${xMan.version}.${rev}`;
   const header = `// ==UserScript==
 // @name         Better Browsing (Reddit + Instagram)
 // @namespace    better-browsing-watdafawx
 // @version      ${version}
-// @description  Reddit Better Browsing ${rMan.version} and Instagram Better Browsing ${igMan.version} in one script. Reddit settings: the gear in Reddit's top bar; Instagram settings: Alt+W.
+// @description  Reddit Better Browsing ${rMan.version}, Instagram Better Browsing ${igMan.version} and X Better Browsing ${xMan.version} in one script. Reddit settings: the gear in Reddit's top bar; Instagram and X settings: Alt+W (also a gear in their sidebars).
 // @match        https://*.reddit.com/*
 // @match        https://www.instagram.com/*
+// @match        https://x.com/*
 // @exclude      https://old.reddit.com/*
 // @run-at       document-start
 // @grant        none
@@ -131,6 +115,7 @@ ${style('igb-css', cssFiles(igMan, 'instagram/src'))}`;
 `;
   const site = `const host = location.hostname;
 if (host === 'www.instagram.com') {${instagram}
+} else if (host === 'x.com') {${xsite}
 } else if (/(^|\.)reddit\.com$/.test(host) && host !== 'old.reddit.com' && !location.pathname.startsWith('/media')) {${reddit}
 }`;
   // Some managers run document-start scripts before <html> exists; everything here needs it.

@@ -31,7 +31,7 @@ const igScript = `<script>
   addEventListener('DOMContentLoaded', () => { igMute(); setTimeout(igMute, 400); });
   window.__igNav = 0; document.addEventListener('click', e => { if (e.target.closest('a[href]')) window.__igNav++; });
 </script>`;
-const feed = `<!doctype html><html><head><title>feed</title>${igScript}</head><body style="margin:0;background:#000;color:#fff">
+const feed = `<!doctype html><html><head><title>feed</title>${igScript}<style>body{-webkit-user-select:none;user-select:none}img{-webkit-user-drag:none}</style></head><body style="margin:0;background:#000;color:#fff">
 <nav id="side" style="position:fixed;left:0;top:200px;width:60px"><div>
   <div><span><a href="/"><svg width="24" height="24" viewBox="0 0 24 24"><title>Home</title><path d="M2 2h20v20H2z"/></svg><span>Home</span></a></span></div>
   <div><span><a href="/reels/"><svg width="24" height="24" viewBox="0 0 24 24"><title>Reels</title><path d="M2 2h20v20H2z"/></svg><span>Reels</span></a></span></div>
@@ -53,7 +53,7 @@ const feed = `<!doctype html><html><head><title>feed</title>${igScript}</head><b
 <article id="photo">
   <header><a href="/p/PHOTOAAAAAA/"><time>2h</time></a></header>
   <div style="position:relative;width:468px;height:585px">
-    <img src="https://cdn.example.test/a2_small.jpg" style="width:468px;height:585px;display:block">
+    <img src="https://cdn.example.test/a2_small.jpg" draggable="false" style="width:468px;height:585px;display:block">
     <div style="position:absolute;inset:0"></div>
     <div role="button" aria-label="Next" style="position:absolute;right:4px;top:280px;width:30px;height:30px;background:#777"></div>
   </div>
@@ -191,6 +191,14 @@ await page.mouse.dblclick(pb.x + 100, pb.y + 100);
 await page.waitForTimeout(500);
 check('double click (like) does not open lightbox', !(await page.$('.igb-lb')), null);
 
+// swiping a carousel (press, drag, release on the photo) still ends in a click where it's released
+await page.mouse.move(pb.x + 100, pb.y + 250);
+await page.mouse.down();
+await page.mouse.move(pb.x + 300, pb.y + 250, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(500);
+check('carousel swipe does not open lightbox', !(await page.$('.igb-lb')), null);
+
 await page.mouse.click(pb.x + 100, pb.y + 100);
 await page.waitForSelector('.igb-lb .igb-lb-dots i', { timeout: 5000 });
 await page.waitForTimeout(300);
@@ -272,6 +280,21 @@ page.on('download', d => names.push(d.suggestedFilename()));
 await page.locator('.igb-tools .igb-dl-all').click();
 await page.waitForTimeout(1500);
 check('download all slides', names.join() === 'alice_PHOTOAAAAAA_1.jpg,alice_PHOTOAAAAAA_2.jpg,alice_PHOTOAAAAAA_3.jpg', names);
+
+// dragging a carousel moves the slide, not the column of buttons
+await page.mouse.move(photo.x + 200, photo.y + 200);
+await page.waitForTimeout(250);
+const barBox = () => page.evaluate(() => { const b = document.querySelector('.igb-tools'), r = b?.getBoundingClientRect(); return r && { left: Math.round(r.left), top: Math.round(r.top), w: Math.round(r.width), hidden: b.hidden }; });
+await page.waitForSelector('.igb-tools:not([hidden]) .igb-tool', { timeout: 3000 });
+const bar0 = await barBox();
+const dragTo = await page.locator('#vid video').boundingBox();
+await page.mouse.down();
+await page.mouse.move(dragTo.x + 150, dragTo.y + 150, { steps: 10 });
+await page.waitForTimeout(150);
+const bar1 = await barBox();
+await page.mouse.up();
+check('buttons stay put while a carousel is dragged', bar0 && bar1 && bar0.w > 0 && !bar0.hidden && !bar1.hidden && bar0.left === bar1.left && bar0.top === bar1.top, { bar0, bar1 });
+
 await page.locator('#single img').scrollIntoViewIfNeeded();
 await page.waitForTimeout(200);
 const single = await page.locator('#single img').boundingBox();

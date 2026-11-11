@@ -7,8 +7,10 @@
   "license": "MIT",
   "scripts": {
     "build": "node build.js",
-    "test": "node test/offline.mjs dist/chrome",
-    "test:instagram": "node test/instagram-offline.mjs dist/instagram-chrome",
+    "build:ext": "node build.js --extensions",
+    "test": "node build.js --extensions && node test/offline.mjs dist/chrome",
+    "test:instagram": "node build.js --extensions && node test/instagram-offline.mjs dist/instagram-chrome",
+    "test:x": "node build.js && node test/x-offline.mjs",
     "release:userscript": "gh release upload userscript dist/better-browsing.user.js --clobber"
   },
   "devDependencies": {
