@@ -402,6 +402,36 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
   await ctx.close();
 }
 
+// ---------- content realm + nonce CSP (Violentmonkey, @inject-into auto, Firefox on X) ----------
+// There the manager runs the script outside the page's JS world and the inline <script> for the page hooks
+// would be blocked, so they must go in with a nonce borrowed from one of the page's own scripts.
+// window.wrappedJSObject (only present in that realm) is faked to take that path.
+{
+  const cspPage = withNonce => `<!doctype html><html><head><title>csp</title>${withNonce ? '<script nonce="n0nce">window.__pageOk = 1</script>' : ''}</head>
+<body style="margin:0"><main>${tweet('c1', 'u1', '900', player('c1v'))}</main></body></html>`;
+  const csp = "default-src 'self'; script-src 'nonce-n0nce' 'unsafe-inline'; style-src 'unsafe-inline'";
+  for (const withNonce of [true, false]) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    await ctx.route(/x\.com|example\.test/, route => {
+      const u = new URL(route.request().url());
+      if (u.pathname === '/csp') return route.fulfill({ status: 200, contentType: 'text/html', headers: { 'content-security-policy': csp }, body: cspPage(withNonce) });
+      return fixtures(route);
+    });
+    await ctx.addInitScript('window.wrappedJSObject = window;');
+    await ctx.addInitScript({ path: usFile });
+    const page = await ctx.newPage();
+    const errs = [];
+    page.on('pageerror', e => errs.push(e.message));
+    await page.goto('https://x.com/csp');
+    await page.waitForTimeout(1500);
+    const s = await page.evaluate(() => ({ main: !!window.__xbbMainWorld, cfg: !!document.documentElement.dataset.xbbVideo, flag: document.documentElement.hasAttribute('data-bb-main') }));
+    const tag = withNonce ? 'nonce CSP, content realm' : 'CSP without any nonce script, content realm';
+    check(tag + ': content part runs', s.cfg, s);
+    check(tag + ': page hooks ' + (withNonce ? 'are injected with the page\'s nonce' : 'are skipped without an error'), s.main === withNonce && !s.flag && errs.length === 0, { s, errs });
+    await ctx.close();
+  }
+}
+
 // ---------- CPU: nothing runs away ----------
 {
   const name = FF ? 'firefox' : 'chromium';
