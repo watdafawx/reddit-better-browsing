@@ -24,6 +24,26 @@
   // One MutationObserver for everything; each subscriber runs at most once per `delay` ms.
   const subs = [];
   IGB.onDomChange = (fn, delay = 250) => subs.push({ fn, delay, t: 0 });
+
+  // A press that slides is a drag (swiping a carousel), not a click. The browser still fires a click
+  // wherever the pointer is released, and the page moves under the pointer while it's down.
+  let press = null;
+  IGB.dragging = () => !!press?.drag;
+  addEventListener('pointerdown', e => {
+    press = e.button === 0 ? { x: e.clientX, y: e.clientY, drag: false } : null;
+  }, true);
+  addEventListener('pointermove', e => {
+    if (!press) return;
+    if (!e.buttons) { press = null; return; }   // released outside the window: no pointerup reached us
+    if (!press.drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press.drag = true;
+  }, { capture: true, passive: true });
+  addEventListener('pointerup', () => {
+    // Keep the flag for the click pointerup dispatches right after this, then forget the press.
+    const p = press;
+    if (p) setTimeout(() => { if (press === p) press = null; }, 0);
+  }, true);
+  addEventListener('pointercancel', () => { press = null; }, true);
+  addEventListener('blur', e => { if (e.target === window) press = null; }, true);   // window loses focus mid-press
   new MutationObserver(() => {
     for (const s of subs) {
       if (s.t) continue;

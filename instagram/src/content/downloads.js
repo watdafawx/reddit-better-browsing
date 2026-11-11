@@ -104,7 +104,7 @@
     const art = media.closest('article');
     if (art) {
       const code = IGB.articleCode(art);
-      return code && { key: code, media, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]'), post: { code: () => code, art: () => art, reel: !!art.querySelector('video') && !art.querySelector('[aria-current="step"]') } };
+      return code && { key: code, media, art, get: () => IGB.getPost(code), idx: () => IGB.activeSlide(art), multi: !!art.querySelector('[aria-current="step"]'), post: { code: () => code, art: () => art, reel: !!art.querySelector('video') && !art.querySelector('[aria-current="step"]') } };
     }
     if (onStory()) return { key: 'story:' + (storyId() || ''), media, get: storyPost, idx: () => 0, multi: false };
     const code = IGB.codeOf(location.pathname);
@@ -134,8 +134,14 @@
   // One floating bar beside the post under the mouse, or else the one in the middle of the window
   const GAP = 8;
   let bar = null, cur = null, mx = -1, my = -1, raf = 0, dirty = false;
+  // A held button means a drag can be moving the media. Track it from mouse moves themselves
+  // (they're what drives place()), so a page that owns the pointer events can't hide a drag from us.
+  let held = false, settleAt = 0;
   function place() {
     raf = 0;
+    // While a carousel slide is being swiped the media moves; hold the buttons still, and wait for
+    // the slide's snap animation to finish before placing them again
+    if (held || IGB.dragging() || Date.now() < settleAt) return;
     if (!anyTools() || document.documentElement.hasAttribute('data-igb-lb')) return hide();
     // Mouse on the column: leave it where it is, but redraw it after a settings change (the
     // auto-scroll switch) and drop it after a page change
@@ -160,17 +166,38 @@
     cur = c;
     c.path = location.pathname;
     // A column beside the media's top-right corner, off the picture; inside the edge only if
-    // there's no room on the right (media running to the window edge).
+    // there's no room on the right (media running to the window edge). On a carousel the slide
+    // moves during a swipe; the post around it stays put, so take the edge from there.
     const r = c.media.getBoundingClientRect();
+    // (only when the article is the post card itself — a modal's article also holds the comments)
+    const art = c.multi && c.art;
+    const card = art && !c.media.closest('[role="dialog"]') && Math.abs(art.offsetWidth - c.media.offsetWidth) <= 40;
+    const ar = card && art.getBoundingClientRect();
+    const right = ar && ar.width > 0 ? ar.right : r.right;
     bar.hidden = false;
     bar.classList.toggle('igb-on-dark', onStory());
     const w = bar.offsetWidth || 36;
-    const x = r.right + GAP + w <= innerWidth ? r.right + GAP : r.right - w - GAP;
+    const x = right + GAP + w <= innerWidth ? right + GAP : right - w - GAP;
     bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(r.top, 0) + GAP)}px)`;
   }
   function hide() { if (bar) bar.hidden = true; cur = null; }
-  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; if (!raf) raf = requestAnimationFrame(place); }, { passive: true });
   const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
+  const endPress = () => {
+    if (!held) return;
+    held = false; settleAt = Date.now() + 350; schedule();
+    setTimeout(schedule, 380);   // place again once the snap animation is over (and apply redraws)
+  };
+  addEventListener('pointerdown', e => { if (e.button === 0) held = true; }, true);
+  addEventListener('pointerup', endPress, true);
+  addEventListener('pointercancel', endPress, true);
+  addEventListener('mouseup', endPress, true);
+  addEventListener('blur', endPress);   // released outside the window
+  addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    if (e.buttons) held = true;
+    else if (!IGB.dragging()) held = false;   // a plain hover move, not a press
+    if (!raf) raf = requestAnimationFrame(place);
+  }, { passive: true });
   addEventListener('scroll', schedule, { passive: true, capture: true });
   addEventListener('resize', schedule, { passive: true });
   addEventListener('mouseleave', () => { mx = my = -1; schedule(); });
