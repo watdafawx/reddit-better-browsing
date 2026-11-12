@@ -4,25 +4,36 @@
   ['pointerdown', 'keydown', 'touchstart'].forEach(t => window.addEventListener(t, () => { lastGesture = Date.now(); }, true));
   const gesture = () => Date.now() - lastGesture < 1200;
 
+
+  // Debug log (localStorage 'bb-debug' = '1', then reload): what this side does to page videos.
+  // Ids match the [BB page] lines (data-bb-dbg on the video).
+  const DBG = (() => { try { return localStorage.getItem('bb-debug') === '1'; } catch { return false; } })();
+  const dbg = DBG ? (v, what) => {
+    if (v && !v.dataset.bbDbg) v.dataset.bbDbg = Math.random().toString(36).slice(2, 6);
+    const st = v ? ` | ${v.paused ? 'paused' : 'playing'} ${v.muted ? 'muted' : 'sound'} vol=${(+v.volume).toFixed(2)}` : '';
+    console.log(`[BB content ${(performance.now() / 1000).toFixed(2)}] ${v ? v.dataset.bbDbg : '-'} ${what}${st}`);
+  } : () => {};
+  if (DBG) console.log('[BB content] loaded, realm: ' + (typeof window.wrappedJSObject !== 'undefined' ? 'content (sandbox: its play()/pause() skip the page hooks)' : 'page'));
+
   // Tab hidden or window unfocused: pause everything that plays, and let nothing start meanwhile
   const known = new Set();         // every <video> guard() has seen, including those inside players' shadow roots
   let blurred = false;
   const away = () => !!RBE.settings.videoPauseOnHide && (document.hidden || blurred);
   const pauseAway = () => {
     if (!away()) return;
-    for (const v of known) { if (!v.isConnected) known.delete(v); else if (!v.paused && document.pictureInPictureElement !== v) v.pause(); }
+    for (const v of known) { if (!v.isConnected) known.delete(v); else if (!v.paused && document.pictureInPictureElement !== v) { dbg(v, 'we pause: tab hidden / window unfocused'); v.pause(); } }
   };
   document.addEventListener('visibilitychange', () => { if (document.hidden) pauseAway(); });
-  addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
-  addEventListener('focus', () => { blurred = false; });
+  addEventListener('blur', () => setTimeout(() => { dbg(null, 'window blur, hasFocus=' + document.hasFocus()); if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
+  addEventListener('focus', () => { dbg(null, 'window focus'); blurred = false; });
 
   const seen = new WeakSet();
   const io = new IntersectionObserver(entries => {
     const s = RBE.settings;
     for (const e of entries) {
       const v = e.target;
-      if (!e.isIntersecting && s.videoPauseOffscreen && !v.paused) { v.pause(); v.dataset.rbePausedOffscreen = '1'; }
-      else if (e.isIntersecting && v.dataset.rbePausedOffscreen && s.videoMode !== 'off' && !away()) { delete v.dataset.rbePausedOffscreen; v.play().catch(() => {}); }
+      if (!e.isIntersecting && s.videoPauseOffscreen && !v.paused) { dbg(v, 'we pause: offscreen'); v.pause(); v.dataset.rbePausedOffscreen = '1'; }
+      else if (e.isIntersecting && v.dataset.rbePausedOffscreen && s.videoMode !== 'off' && !away()) { delete v.dataset.rbePausedOffscreen; dbg(v, 'we resume: back on screen'); v.play().catch(e => dbg(v, 'resume refused: ' + e?.name)); }
     }
   }, { threshold: 0.15 });
 
@@ -33,8 +44,8 @@
     io.observe(v);
     v.addEventListener('play', () => {
       const s = RBE.settings;
-      if (away() && !gesture()) { v.pause(); return; }
-      if (s.videoMode === 'off' && !gesture() && !v.dataset.rbeAllowed) v.pause();
+      if (away() && !gesture()) { dbg(v, 'we pause: started while you are away'); v.pause(); return; }
+      if (s.videoMode === 'off' && !gesture() && !v.dataset.rbeAllowed) { dbg(v, 'we pause: autoplay off'); v.pause(); }
       if (gesture()) v.dataset.rbeAllowed = '1';
     });
   }

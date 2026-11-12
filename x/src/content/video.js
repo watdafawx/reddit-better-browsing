@@ -10,6 +10,17 @@
   const isGif = v => v.hasAttribute('data-xbb-gif') || /\/tweet_video\//.test(v.currentSrc || v.src || '');
   const managed = v => v instanceof HTMLVideoElement && !ours(v) && !!v.closest(PLAYER) && !isGif(v);
 
+
+  // Debug log (localStorage 'bb-debug' = '1', then reload): what this side does to page videos.
+  // Ids match the [BB page] lines (data-bb-dbg on the video).
+  const DBG = (() => { try { return localStorage.getItem('bb-debug') === '1'; } catch { return false; } })();
+  const dbg = DBG ? (v, what) => {
+    if (v && !v.dataset.bbDbg) v.dataset.bbDbg = Math.random().toString(36).slice(2, 6);
+    const st = v ? ` | ${v.paused ? 'paused' : 'playing'} ${v.muted ? 'muted' : 'sound'} vol=${(+v.volume).toFixed(2)}` : '';
+    console.log(`[BB content ${(performance.now() / 1000).toFixed(2)}] ${v ? v.dataset.bbDbg : '-'} ${what}${st}`);
+  } : () => {};
+  if (DBG) console.log('[BB content] loaded, realm: ' + (typeof window.wrappedJSObject !== 'undefined' ? 'content (sandbox: its play()/pause() skip the page hooks)' : 'page'));
+
   const score = new Map();         // the videos we watch (the observer only wakes us up; see sc())
   const userPaused = new WeakSet();
   const failed = new WeakSet();
@@ -18,7 +29,11 @@
 
   // ---------- user gestures (to tell your clicks from X's own play/pause calls) ----------
   let lastGesture = 0, lastTarget = null;
-  const onGesture = e => { lastGesture = Date.now(); lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target; };
+  const onGesture = e => {
+    if (e.type === 'focusin' && !navigator.userActivation?.isActive) return;   // X moving focus itself
+    lastGesture = Date.now();
+    lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
+  };
   ['pointerdown', 'keydown', 'touchstart', 'focusin'].forEach(t => addEventListener(t, onGesture, true));
   // Firefox never shows the page a click on a video's own controls (no pointerdown/click), only that the
   // pointer is over it and that the page got user activation. So a play/pause while the pointer rests on
@@ -57,7 +72,7 @@
     const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
     return w <= 0 || h <= 0 ? 0 : h / Math.min(r.height, innerHeight);
   };
-  const quiet = v => { v._xbbQuiet = performance.now(); v.pause(); };   // a pause that is ours, not yours
+  const quiet = (v, why) => { dbg(v, 'we pause: ' + why); v._xbbQuiet = performance.now(); v.pause(); };   // a pause that is ours, not yours
   const isPip = v => document.pictureInPictureElement === v;
 
   // ---------- tab hidden / window unfocused: pause, and let nothing start meanwhile ----------
@@ -65,20 +80,29 @@
   const away = () => !!XBB.settings.videoPauseOnHide && (document.hidden || blurred);
   const pauseAway = () => {
     if (!away()) return;
-    for (const v of score.keys()) if (v.isConnected && managed(v) && !v.paused && !isPip(v)) quiet(v);   // ours, not yours: it resumes when you are back
+    for (const v of score.keys()) if (v.isConnected && managed(v) && !v.paused && !isPip(v)) quiet(v, 'tab hidden / window unfocused');   // ours, not yours: it resumes when you are back
   };
-  addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
-  addEventListener('focus', () => { blurred = false; schedule(0); });
+  addEventListener('blur', () => setTimeout(() => { dbg(null, 'window blur, hasFocus=' + document.hasFocus()); if (!document.hasFocus()) { blurred = true; pauseAway(); } }));
+  addEventListener('focus', () => { dbg(null, 'window focus'); blurred = false; schedule(0); });
 
   function start(v) {
-    if (failed.has(v)) return;
-    // main-world.js's play() handles sound before the first click (starts muted, unmutes on the click)
-    v.play().catch(err => { if (err?.name !== 'AbortError') failed.add(v); });
+    if (failed.has(v)) { dbg(v, 'not starting: an earlier start failed'); return; }
+    dbg(v, 'we start the pick');
+    // main-world.js's play() handles sound before the first click (starts muted, unmutes on the click).
+    // In Firefox's content realm (Violentmonkey, @inject-into auto) this play() is the browser's own and
+    // skips that, so a refused audible start is retried muted here; main-world.js's playing handler then
+    // keeps it waiting for the click.
+    v.play().catch(err => {
+      dbg(v, 'start refused: ' + err?.name);
+      if (err?.name === 'NotAllowedError' && !v.muted) { v.muted = true; return v.play(); }
+      throw err;
+    }).catch(err => { dbg(v, 'start failed: ' + err?.name); if (err?.name !== 'AbortError') failed.add(v); });
   }
   const setPick = v => {
     if (pick === v) return;
     pick?.removeAttribute('data-xbb-pick');
     pick = v;
+    dbg(v, 'new pick');
     v?.setAttribute('data-xbb-pick', '');
   };
 
@@ -94,7 +118,7 @@
     for (const v of list) {
       if (sc(v) < 0.05) {
         userPaused.delete(v);
-        if (s.videoPauseOffscreen && !v.paused && !isPip(v) && document.fullscreenElement !== v) quiet(v);
+        if (s.videoPauseOffscreen && !v.paused && !isPip(v) && document.fullscreenElement !== v) quiet(v, 'offscreen');
       }
     }
     if (chosen && sc(chosen) < 0.1) chosen = null;
@@ -113,7 +137,7 @@
     }
     setPick(best);
 
-    if (s.videoOneAtATime) for (const v of list) if (v !== best && !v.paused && !isPip(v)) quiet(v);
+    if (s.videoOneAtATime) for (const v of list) if (v !== best && !v.paused && !isPip(v)) quiet(v, 'not the pick');
     if (s.videoMode === 'off' || hush || away()) return;
     // autoplay: the pick; without one-at-a-time, every video that is well in view
     const targets = s.videoOneAtATime ? (best ? [best] : []) : list.filter(v => sc(v) >= 0.5);
@@ -126,23 +150,24 @@
   document.addEventListener('play', e => {
     const v = e.target, s = XBB.settings;
     if (!managed(v)) return;
-    if (away() && !userOn(v)) { quiet(v); return; }   // X restarting something while you are away
+    if (away() && !userOn(v)) { quiet(v, 'started while you are away'); return; }   // X restarting something while you are away
     if (userOn(v)) {                       // you started it: it wins, and everything else yields
+      dbg(v, 'you started it');
       userPaused.delete(v);
       chosen = v;
       setPick(v);
-      if (s.videoOneAtATime) for (const o of [...score.keys()]) if (o !== v && !o.paused && managed(o)) quiet(o);
+      if (s.videoOneAtATime) for (const o of [...score.keys()]) if (o !== v && !o.paused && managed(o)) quiet(o, 'you started another');
     } else if (s.videoOneAtATime && s.videoMode !== 'default' && v !== pick) {
       // X started one on its own. It may well be the one that should play (a scroll just moved it to the
       // middle): pick again with the current positions first; stopping it only if it still is not the pick.
       evaluate();
-      if (v !== pick && !v.paused) quiet(v);
+      if (v !== pick && !v.paused) quiet(v, 'X started a video that is not the pick');
     }
   }, true);
   document.addEventListener('pause', e => {
     const v = e.target;
     if (!managed(v) || v.ended || performance.now() - (v._xbbQuiet || 0) < 400) return;
-    if (userOn(v)) { userPaused.add(v); if (chosen === v) chosen = null; }
+    if (userOn(v)) { dbg(v, 'you paused it (sticks while in view)'); userPaused.add(v); if (chosen === v) chosen = null; }
   }, true);
   document.addEventListener('ended', e => {
     if (e.target === chosen) chosen = null;

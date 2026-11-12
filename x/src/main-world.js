@@ -12,8 +12,45 @@
   const mutedDesc = Object.getOwnPropertyDescriptor(P, 'muted');
   const volDesc = Object.getOwnPropertyDescriptor(P, 'volume');
   const autoDesc = Object.getOwnPropertyDescriptor(P, 'autoplay');
-  const setMuted = (el, v) => mutedDesc.set.call(el, v);
-  const setVol = (el, v) => volDesc.set.call(el, v);
+  // Remember the audio state our own writes leave, so the volumechange they cause is never taken
+  // for the user's (that made a video we had to mute stay muted for good).
+  const mine = new WeakMap();
+  const note = el => mine.set(el, [mutedDesc.get.call(el), volDesc.get.call(el)]);
+  const setMuted = (el, v) => { mutedDesc.set.call(el, v); note(el); };
+  const setVol = (el, v) => { volDesc.set.call(el, v); note(el); };
+  const isMine = el => { const m = mine.get(el); return !!m && m[0] === el.muted && Math.abs(m[1] - el.volume) < 0.01; };
+
+  // ---------- debug log: off unless localStorage 'bb-debug' is '1' (then reload). Every play, pause and
+  // audio change of a page video, with who did it: "by page" = the site's own code (with where it was
+  // called from), "we ..." = these hooks; a bare "event pause" with no call before it comes from the
+  // content script ([BB content] lines) or the browser itself.
+  const DBG = (() => { try { return localStorage.getItem('bb-debug') === '1'; } catch { return false; } })();
+  const caller = () => { const l = (new Error().stack || '').split('\n').filter(s => s && s !== 'Error'); return l.slice(2, 4).map(s => s.trim().replace(/^at /, '').slice(-80)).join(' < '); };
+  const dbg = DBG ? (el, what) => {
+    if (!el.dataset.bbDbg) el.dataset.bbDbg = Math.random().toString(36).slice(2, 6);
+    const ua = navigator.userActivation;
+    let pol = '-'; try { if (navigator.getAutoplayPolicy) pol = navigator.getAutoplayPolicy(el); } catch {}
+    console.log(`[BB page ${(performance.now() / 1000).toFixed(2)}] ${el.dataset.bbDbg} ${what} | ${el.paused ? 'paused' : 'playing'} ${mutedDesc.get.call(el) ? 'muted' : 'sound'} vol=${volDesc.get.call(el).toFixed(2)} activated=${ua?.hasBeenActive ? 1 : 0}${ua?.isActive ? '+' : ''} policy=${pol}`);
+  } : () => {};
+  const watched = new WeakSet();
+  const watch = DBG ? el => {
+    if (!(el instanceof HTMLVideoElement) || watched.has(el)) return;
+    watched.add(el);
+    ['play', 'playing', 'pause', 'volumechange', 'emptied', 'ended'].forEach(t => el.addEventListener(t, () => dbg(el, 'event ' + t)));
+  } : () => {};
+  if (DBG) {
+    console.log('[BB page] hooks loaded at ' + (performance.now() / 1000).toFixed(2) + 's');
+    const origPause = P.pause;
+    P.pause = function () { if (this instanceof HTMLVideoElement) { watch(this); dbg(this, 'pause() by page: ' + caller()); } return origPause.apply(this, arguments); };
+    new MutationObserver(() => document.querySelectorAll('video').forEach(watch)).observe(document, { childList: true, subtree: true });
+  }
+  const activated = () => !!navigator.userActivation?.hasBeenActive;
+  // May this video make sound now? Unmuting a playing video when it may not makes the browser pause it,
+  // X then restarts it and the browser only lets it play muted: play, stop, play silent.
+  const canSound = el => {
+    try { if (navigator.getAutoplayPolicy) return navigator.getAutoplayPolicy(el) === 'allowed'; } catch {}
+    return activated();
+  };
 
   const PLAYER = '[data-testid="videoPlayer"]';
   let lastGesture = 0, lastTarget = null;
@@ -47,11 +84,14 @@
   // Videos that had to start muted because the browser blocked audible autoplay; unmute on first interaction.
   const waiting = new Set();
   const onGesture = e => {
+    // focus moves by script too (X focuses things itself): only a focus with user activation is yours
+    if (e.type === 'focusin' && !navigator.userActivation?.isActive) return;
     lastGesture = Date.now();
     lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
-    if (cfg.mode !== 'volume' || !level()) return;
+    if (cfg.mode !== 'volume' || !level() || !activated()) return;
     for (const v of waiting) {
-      if (v.isConnected && !v.paused && !v.dataset.xbbUserAudio) { setVol(v, level()); setMuted(v, false); }
+      if (v.isConnected && v.paused) continue;   // the playing handler unmutes it when it starts again
+      if (v.isConnected && !v.dataset.xbbUserAudio) { dbg(v, 'we unmute: first ' + e.type); setVol(v, level()); setMuted(v, false); }
       waiting.delete(v);
     }
   };
@@ -62,6 +102,9 @@
     if (cfg.mode === 'muted') setMuted(el, true);
     else if (cfg.mode === 'volume' || cfg.mode === 'off') {
       setVol(el, level());
+      // a playing muted video stays muted until it may make sound (unmuting it now would pause it)
+      if (level() && el.muted && !el.paused && !canSound(el)) { dbg(el, 'we keep it muted until sound is allowed'); waiting.add(el); return; }
+      if (DBG && el.muted === !!level()) dbg(el, 'we set ' + (level() ? 'sound' : 'muted'));
       setMuted(el, !level());
     }
   }
@@ -75,14 +118,17 @@
 
   P.play = function () {
     if (!active(this)) return origPlay.apply(this, arguments);
+    if (DBG) { watch(this); dbg(this, 'play() by page: ' + caller() + (gated(this) && !mayPlay(this) ? ' -> SWALLOWED (not the pick)' : '')); }
     if (gated(this) && !mayPlay(this)) return Promise.resolve();   // swallow X's autoplay
     applyAudio(this);
     const el = this;
     return origPlay.call(this).catch(err => {
+      dbg(el, 'play() refused: ' + err?.name);
       if (err && err.name === 'NotAllowedError' && !el.muted) {
+        dbg(el, 'we retry muted');
         setMuted(el, true); // browser refuses sound before the first click: start muted, unmute on first gesture
         waiting.add(el);
-        return origPlay.call(el);
+        return origPlay.call(el).catch(e => { if (e?.name !== 'AbortError') throw e; });
       }
       throw err;
     });
@@ -102,12 +148,12 @@
   Object.defineProperty(P, 'muted', {
     configurable: true, enumerable: true,
     get() { return mutedDesc.get.call(this); },
-    set(v) { if (userWrite(this)) setMuted(this, v); }
+    set(v) { const ok = userWrite(this); if (DBG && active(this)) { watch(this); dbg(this, 'page sets muted=' + v + (ok ? ' (yours)' : ' -> IGNORED') + ': ' + caller()); } if (ok) setMuted(this, v); }
   });
   Object.defineProperty(P, 'volume', {
     configurable: true, enumerable: true,
     get() { return volDesc.get.call(this); },
-    set(v) { if (userWrite(this)) setVol(this, v); }
+    set(v) { const ok = userWrite(this); if (DBG && active(this)) { watch(this); dbg(this, 'page sets volume=' + (+v).toFixed(2) + (ok ? ' (yours)' : ' -> IGNORED') + ': ' + caller()); } if (ok) setVol(this, v); }
   });
   // The autoplay attribute bypasses play(); neuter it when autoplay is gated.
   Object.defineProperty(P, 'autoplay', {
@@ -118,11 +164,10 @@
 
   // React sets `muted` as a property on mount, before play(); re-apply our level when playback starts.
   // Before the page has had a click, unmuting would make the browser pause the video: wait for the click.
-  const activated = () => !!navigator.userActivation?.hasBeenActive;
   document.addEventListener('playing', e => {
     const v = e.target;
     if (!active(v)) return;
-    if (!activated() && v.muted && cfg.mode === 'volume') { waiting.add(v); return; }
+    if (v.muted && cfg.mode === 'volume' && !canSound(v)) { waiting.add(v); return; }
     if (waiting.has(v) && activated()) waiting.delete(v);
     if (!waiting.has(v)) applyAudio(v);
   }, true);
@@ -132,8 +177,9 @@
   setInterval(() => {
     if (cfg.mode !== 'volume' || !level() || document.hidden || !activated()) return;
     for (const v of document.querySelectorAll('video')) {
-      if (v.paused || !v.muted || v.dataset.xbbUserAudio || !active(v)) continue;
+      if (v.paused || !v.muted || v.dataset.xbbUserAudio || !active(v) || !canSound(v)) continue;
       waiting.delete(v);
+      dbg(v, 'we unmute: safety net');
       setVol(v, level());
       setMuted(v, false);
     }
@@ -144,10 +190,11 @@
   // set (not a mute) becomes the level for the videos after it.
   document.addEventListener('volumechange', e => {
     const v = e.target;
-    if (!active(v) || v.dataset.xbbUserAudio || !userOn(v)) return;
+    if (!active(v) || v.dataset.xbbUserAudio || isMine(v) || !userOn(v)) return;
     const want = cfg.mode === 'muted' ? null : level();
     const same = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
     if (same) return;
+    dbg(v, 'audio change taken as yours (browser controls)');
     v.dataset.xbbUserAudio = '1';
     waiting.delete(v);
     if (!v.muted && v.volume > 0 && cfg.mode !== 'muted') sessionVol = v.volume;

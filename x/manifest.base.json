@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "X Better Browsing",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Userscript only (no browser extension is built for X). This file lists the scripts build.js puts into dist/better-browsing.user.js, in load order, and holds the X part's version.",
   "content_scripts": [
     {
