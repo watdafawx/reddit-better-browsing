@@ -376,6 +376,23 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
   await ctx.close();
 }
 
+// ---------- debug log (localStorage bb-debug) ----------
+{
+  const { ctx, page } = await open(null, '/feed', 700, "localStorage.setItem('bb-debug', '1');");
+  const lines = [], errs = [];
+  page.on('console', m => { if (m.text().startsWith('[BB ')) lines.push(m.text()); });
+  page.on('pageerror', e => errs.push(e.message));
+  await page.reload();
+  await page.waitForTimeout(1500);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(800);
+  const has = re => lines.some(l => re.test(l));
+  check('debug log: page hooks and content side both log plays, pauses and picks, without errors',
+    has(/^\[BB page\] hooks loaded/) && has(/^\[BB content\] loaded, realm/) && has(/\[BB page [\d.]+\] \w+ play\(\) by page/) &&
+    has(/\[BB content [\d.]+\] \w+ new pick/) && has(/event play/) && errs.length === 0, { n: lines.length, errs, sample: lines.slice(0, 6) });
+  await ctx.close();
+}
+
 // ---------- X keeps replaying the videos we stop: no tug of war ----------
 {
   const { ctx, page } = await open(null, '/feed', 700);

@@ -70,6 +70,7 @@ and click **Install**. That one script runs Reddit Better Browsing on reddit.com
 
 - **Account switching** saves and restores Reddit's login cookies. Passwords are never stored. Saved sessions are kept in the extension's local storage on your computer, so anyone with access to your browser profile could use them. Logging out on Reddit ends that saved session; save the account again afterwards.
 - **Sound before the first click**: browsers block audible autoplay until you've interacted with the page. Until then videos start muted, then unmute to your chosen volume on your first click or key press.
+- **Video debug log** (Reddit and X): to see why a video paused or lost its sound, run `localStorage.setItem('bb-debug', '1')` in the browser console on that site and reload. Every play, pause and mute is then logged as `[BB page …]` (the site's own calls, and our page hooks) and `[BB content …]` (our autoplay picking and pausing), with the video's state and whether the browser allows sound yet. `localStorage.removeItem('bb-debug')` and a reload turn it off.
 - **Voting and replying** aren't built into the viewer yet. Use "Reply on Reddit ↗" or "Open on Reddit".
 - **Old Reddit** (old.reddit.com) is not supported.
 - Reddit changes its page markup often. The viewer and image viewer load content from Reddit's JSON API, so they hold up well. Themes and layout presets depend on Reddit's CSS names and may need updating; use Custom CSS for quick fixes.

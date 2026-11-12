@@ -16,6 +16,31 @@
   const setVol = (el, v) => { volDesc.set.call(el, v); note(el); };
   const isMine = el => { const m = mine.get(el); return !!m && m[0] === el.muted && Math.abs(m[1] - el.volume) < 0.01; };
 
+  // ---------- debug log: off unless localStorage 'bb-debug' is '1' (then reload). Every play, pause and
+  // audio change of a page video, with who did it: "by page" = the site's own code (with where it was
+  // called from), "we ..." = these hooks; a bare "event pause" with no call before it comes from the
+  // content script ([BB content] lines) or the browser itself.
+  const DBG = (() => { try { return localStorage.getItem('bb-debug') === '1'; } catch { return false; } })();
+  const caller = () => { const l = (new Error().stack || '').split('\n').filter(s => s && s !== 'Error'); return l.slice(2, 4).map(s => s.trim().replace(/^at /, '').slice(-80)).join(' < '); };
+  const dbg = DBG ? (el, what) => {
+    if (!el.dataset.bbDbg) el.dataset.bbDbg = Math.random().toString(36).slice(2, 6);
+    const ua = navigator.userActivation;
+    let pol = '-'; try { if (navigator.getAutoplayPolicy) pol = navigator.getAutoplayPolicy(el); } catch {}
+    console.log(`[BB page ${(performance.now() / 1000).toFixed(2)}] ${el.dataset.bbDbg} ${what} | ${el.paused ? 'paused' : 'playing'} ${mutedDesc.get.call(el) ? 'muted' : 'sound'} vol=${volDesc.get.call(el).toFixed(2)} activated=${ua?.hasBeenActive ? 1 : 0}${ua?.isActive ? '+' : ''} policy=${pol}`);
+  } : () => {};
+  const watched = new WeakSet();
+  const watch = DBG ? el => {
+    if (!(el instanceof HTMLVideoElement) || watched.has(el)) return;
+    watched.add(el);
+    ['play', 'playing', 'pause', 'volumechange', 'emptied', 'ended'].forEach(t => el.addEventListener(t, () => dbg(el, 'event ' + t)));
+  } : () => {};
+  if (DBG) {
+    console.log('[BB page] hooks loaded at ' + (performance.now() / 1000).toFixed(2) + 's');
+    const origPause = P.pause;
+    P.pause = function () { if (this instanceof HTMLVideoElement) { watch(this); dbg(this, 'pause() by page: ' + caller()); } return origPause.apply(this, arguments); };
+    new MutationObserver(() => document.querySelectorAll('video').forEach(watch)).observe(document, { childList: true, subtree: true });
+  }
+
   let lastGesture = 0, lastTarget = null;
   const gesture = () => Date.now() - lastGesture < 1200 || !!(navigator.userActivation && navigator.userActivation.isActive && Date.now() - lastGesture < 5000);
   // A recent click/key on THIS video's own player (the video, its controls, across shadow DOM).
@@ -57,7 +82,7 @@
     for (const v of waitingForGesture) {
       if (!v.isConnected) { waitingForGesture.delete(v); continue; }
       if (v.paused) continue;               // the playing handler unmutes it when it starts again
-      if (!v.dataset.rbeUserAudio) { setVol(v, c.volume / 100); setMuted(v, false); }
+      if (!v.dataset.rbeUserAudio) { dbg(v, 'we unmute: first ' + e.type); setVol(v, c.volume / 100); setMuted(v, false); }
       waitingForGesture.delete(v);
     }
   };
@@ -69,7 +94,8 @@
     else if (c.mode === 'volume' || c.mode === 'off') {
       setVol(el, Math.max(0, Math.min(1, (c.volume || 0) / 100)));
       // a playing muted video stays muted until it may make sound (unmuting it now would pause it)
-      if (c.volume && el.muted && !el.paused && !canSound(el)) { waitingForGesture.add(el); return; }
+      if (c.volume && el.muted && !el.paused && !canSound(el)) { dbg(el, 'we keep it muted until sound is allowed'); waitingForGesture.add(el); return; }
+      if (DBG && el.muted === !!c.volume) dbg(el, 'we set ' + (c.volume ? 'sound' : 'muted'));
       setMuted(el, !c.volume);
     }
   }
@@ -92,6 +118,7 @@
     played.add(this);
     const c = cfg();
     const user = gesture();
+    if (DBG) { watch(this); dbg(this, 'play() by page: ' + caller() + (c.mode === 'off' && !user && !this.dataset.rbeAllowed ? ' -> SWALLOWED (autoplay off)' : '')); }
     if (c.mode === 'off' && !user && !this.dataset.rbeAllowed) {
       return Promise.resolve();               // swallow autoplay
     }
@@ -99,7 +126,9 @@
     applyAudio(this, c);
     const el = this;
     return origPlay.call(this).catch(err => {
+      dbg(el, 'play() refused: ' + err?.name);
       if (err && err.name === 'NotAllowedError' && !el.muted) {
+        dbg(el, 'we retry muted');
         setMuted(el, true);                    // browser refuses sound before first click → start muted
         waitingForGesture.add(el);
         return origPlay.call(el).catch(e => { if (e?.name !== 'AbortError') throw e; });
@@ -116,6 +145,7 @@
     configurable: true, enumerable: true,
     get() { return mutedDesc.get.call(this); },
     set(v) {
+      if (DBG && active(this)) { watch(this); dbg(this, 'page sets muted=' + v + (this.dataset.rbeUserAudio || userOn(this) ? ' (yours)' : ' -> IGNORED') + ': ' + caller()); }
       if (active(this) && !this.dataset.rbeUserAudio) {
         if (!userOn(this)) return;               // ignore page-initiated (un)mute
         // Only a change that leaves the video away from our level needs protecting from the
@@ -130,6 +160,7 @@
     configurable: true, enumerable: true,
     get() { return volDesc.get.call(this); },
     set(v) {
+      if (DBG && active(this)) { watch(this); dbg(this, 'page sets volume=' + (+v).toFixed(2) + (this.dataset.rbeUserAudio || userOn(this) ? ' (yours)' : ' -> IGNORED') + ': ' + caller()); }
       if (active(this) && !this.dataset.rbeUserAudio) {
         if (!userOn(this)) return;
         if (Math.abs(v - wantVol(cfg())) > 0.01) this.dataset.rbeUserAudio = '1';
@@ -153,7 +184,7 @@
     if (!active(v) || v.dataset.rbeUserAudio || isMine(v) || !userOn(v)) return;
     const want = c.mode === 'muted' ? null : Math.max(0, Math.min(1, (c.volume || 0) / 100));
     const ours = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
-    if (!ours) { v.dataset.rbeUserAudio = '1'; waitingForGesture.delete(v); }
+    if (!ours) { dbg(v, 'audio change taken as yours (browser controls)'); v.dataset.rbeUserAudio = '1'; waitingForGesture.delete(v); }
   }, true);
 
   // Safety net: a playing video that is muted (or silent, e.g. volume left at 0) though the user
@@ -170,6 +201,7 @@
       if (v.paused || v.dataset.rbeUserAudio || !active(v) || !canSound(v)) continue;
       if (!v.muted && Math.abs(v.volume - want) < 0.01) continue;
       waitingForGesture.delete(v);
+      dbg(v, 'we unmute: safety net');
       setVol(v, want);
       setMuted(v, false);
     }
