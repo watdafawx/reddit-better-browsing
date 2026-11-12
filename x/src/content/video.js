@@ -18,7 +18,11 @@
 
   // ---------- user gestures (to tell your clicks from X's own play/pause calls) ----------
   let lastGesture = 0, lastTarget = null;
-  const onGesture = e => { lastGesture = Date.now(); lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target; };
+  const onGesture = e => {
+    if (e.type === 'focusin' && !navigator.userActivation?.isActive) return;   // X moving focus itself
+    lastGesture = Date.now();
+    lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
+  };
   ['pointerdown', 'keydown', 'touchstart', 'focusin'].forEach(t => addEventListener(t, onGesture, true));
   // Firefox never shows the page a click on a video's own controls (no pointerdown/click), only that the
   // pointer is over it and that the page got user activation. So a play/pause while the pointer rests on
@@ -72,8 +76,14 @@
 
   function start(v) {
     if (failed.has(v)) return;
-    // main-world.js's play() handles sound before the first click (starts muted, unmutes on the click)
-    v.play().catch(err => { if (err?.name !== 'AbortError') failed.add(v); });
+    // main-world.js's play() handles sound before the first click (starts muted, unmutes on the click).
+    // In Firefox's content realm (Violentmonkey, @inject-into auto) this play() is the browser's own and
+    // skips that, so a refused audible start is retried muted here; main-world.js's playing handler then
+    // keeps it waiting for the click.
+    v.play().catch(err => {
+      if (err?.name === 'NotAllowedError' && !v.muted) { v.muted = true; return v.play(); }
+      throw err;
+    }).catch(err => { if (err?.name !== 'AbortError') failed.add(v); });
   }
   const setPick = v => {
     if (pick === v) return;

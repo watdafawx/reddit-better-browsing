@@ -89,10 +89,11 @@ const launchOpts = FF ? { firefoxUserPrefs: process.env.FFDEFAULT ? {} : { 'medi
 const browser = await (FF ? firefox : chromium).launch(launchOpts);
 const logs = [], ok = {}, r = {};
 const check = (name, cond, detail) => { ok[name] = !!cond; r[name] = detail; };
-async function open(seed, urlPath = '/home', height = 900) {
+async function open(seed, urlPath = '/home', height = 900, pre = '') {
   const ctx = await browser.newContext({ viewport: { width: 1400, height } });
   await ctx.route(/x\.com|example\.test/, fixtures);
   if (!FF) await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'https://x.com' });
+  if (pre) await ctx.addInitScript(pre);
   await ctx.addInitScript(seed ? `localStorage.setItem('xbb-userscript-settings', ${JSON.stringify(JSON.stringify({ settings: seed }))});` : '');
   await ctx.addInitScript({ path: usFile });
   const page = await ctx.newPage();
@@ -346,6 +347,33 @@ const geo = (page, ids) => page.evaluate(ids => { const mid = innerHeight / 2; r
     check('pause-on-hide off: the video keeps playing', (await run(page)).length === 1, await run(page));
     await ctx.close();
   }
+}
+
+// ---------- browser allows sound only after a click: no "plays, stops, plays silent" ----------
+{
+  // Fake the browser's autoplay policy: muted autoplay only, until the test allows sound. Keep the
+  // browser's own muted setter to mute the playing video the way the browser's fallback leaves it.
+  const pre = `window.__policy = 'allowed-muted'; Navigator.prototype.getAutoplayPolicy = function () { return window.__policy; };
+    window.__mute = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted').set;`;
+  const { ctx, page } = await open(null, '/feed', 700, pre);
+  await page.waitForTimeout(1500);
+  const st = () => page.evaluate(() => [...document.querySelectorAll('video')].filter(v => !v.paused).map(v => ({ id: v.id, muted: v.muted, volume: +v.volume.toFixed(2), pauses: v.__pauses || 0 })));
+  await page.evaluate(() => {
+    const v = [...document.querySelectorAll('video')].find(v => !v.paused);
+    v.__pauses = 0; v.addEventListener('pause', () => v.__pauses++);
+    window.__mute.call(v, true);
+    v.dispatchEvent(new Event('playing'));   // what a muted restart fires
+    v.play();                                // and X calling play() on it again
+  });
+  await page.waitForTimeout(1300);           // the safety net runs twice meanwhile
+  const a = await st();
+  check('sound not allowed yet: the playing video stays muted and is never paused by an unmute', a.length === 1 && a[0].muted && a[0].pauses === 0, a);
+  await page.evaluate(() => { window.__policy = 'allowed'; });
+  await page.mouse.click(1300, 650);         // a click away from the video
+  await page.waitForTimeout(300);
+  const b = await st();
+  check('first click: that video gets its sound (40%) and keeps playing', b.length === 1 && !b[0].muted && b[0].volume === 0.4 && b[0].pauses === 0, b);
+  await ctx.close();
 }
 
 // ---------- X keeps replaying the videos we stop: no tug of war ----------

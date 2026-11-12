@@ -11,8 +11,20 @@
   const mutedDesc = Object.getOwnPropertyDescriptor(P, 'muted');
   const volDesc = Object.getOwnPropertyDescriptor(P, 'volume');
   const autoDesc = Object.getOwnPropertyDescriptor(P, 'autoplay');
-  const setMuted = (el, v) => mutedDesc.set.call(el, v);
-  const setVol = (el, v) => volDesc.set.call(el, v);
+  // Remember the audio state our own writes leave, so the volumechange they cause is never taken
+  // for the user's (that made a video we had to mute stay muted for good).
+  const mine = new WeakMap();
+  const note = el => mine.set(el, [mutedDesc.get.call(el), volDesc.get.call(el)]);
+  const setMuted = (el, v) => { mutedDesc.set.call(el, v); note(el); };
+  const setVol = (el, v) => { volDesc.set.call(el, v); note(el); };
+  const isMine = el => { const m = mine.get(el); return !!m && m[0] === el.muted && Math.abs(m[1] - el.volume) < 0.01; };
+  const activated = () => !!navigator.userActivation?.hasBeenActive;
+  // May this video make sound now? Unmuting a playing video when it may not makes the browser pause it,
+  // Instagram then restarts it and the browser only lets it play muted: play, stop, play silent.
+  const canSound = el => {
+    try { if (navigator.getAutoplayPolicy) return navigator.getAutoplayPolicy(el) === 'allowed'; } catch {}
+    return activated();
+  };
 
   let lastGesture = 0, lastTarget = null;
   const gesture = () => Date.now() - lastGesture < 1200;
@@ -47,9 +59,10 @@
   const onGesture = e => {
     lastGesture = Date.now();
     lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
-    if (cfg.mode !== 'volume' || !cfg.volume) return;
+    if (cfg.mode !== 'volume' || !cfg.volume || !activated()) return;
     for (const v of waiting) {
-      if (v.isConnected && !v.paused && !v.dataset.igbUserAudio) { setVol(v, cfg.volume / 100); setMuted(v, false); }
+      if (v.isConnected && v.paused) continue;   // the playing handler unmutes it when it starts again
+      if (v.isConnected && !v.dataset.igbUserAudio) { setVol(v, cfg.volume / 100); setMuted(v, false); }
       waiting.delete(v);
     }
   };
@@ -60,6 +73,8 @@
     if (cfg.mode === 'muted') setMuted(el, true);
     else if (cfg.mode === 'volume' || cfg.mode === 'off') {
       setVol(el, Math.max(0, Math.min(1, (cfg.volume || 0) / 100)));
+      // a playing muted video stays muted until it may make sound (unmuting it now would pause it)
+      if (cfg.volume && el.muted && !el.paused && !canSound(el)) { waiting.add(el); return; }
       setMuted(el, !cfg.volume);
     }
   }
@@ -82,7 +97,7 @@
       if (err && err.name === 'NotAllowedError' && !el.muted) {
         setMuted(el, true); // browser refuses sound before the first click: start muted, unmute on first gesture
         waiting.add(el);
-        return origPlay.call(el);
+        return origPlay.call(el).catch(e => { if (e?.name !== 'AbortError') throw e; });
       }
       throw err;
     });
@@ -120,7 +135,6 @@
 
   // React sets `muted` as a property on mount, before play(); re-apply our level when playback starts.
   // A video still waiting for a click is fine to unmute once the page has had one.
-  const activated = () => !!navigator.userActivation?.hasBeenActive;
   document.addEventListener('playing', e => {
     const v = e.target;
     if (!active(v)) return;
@@ -134,7 +148,7 @@
   setInterval(() => {
     if (cfg.mode !== 'volume' || !cfg.volume || document.hidden || !activated()) return;
     for (const v of document.querySelectorAll('video')) {
-      if (v.paused || !v.muted || v.dataset.igbUserAudio || !active(v)) continue;
+      if (v.paused || !v.muted || v.dataset.igbUserAudio || !active(v) || !canSound(v)) continue;
       waiting.delete(v);
       setVol(v, cfg.volume / 100);
       setMuted(v, false);
@@ -144,7 +158,7 @@
   // A change on this player that differs from our level is the user's: keep it from then on.
   document.addEventListener('volumechange', e => {
     const v = e.target;
-    if (!active(v) || v.dataset.igbUserAudio || !userOn(v)) return;
+    if (!active(v) || v.dataset.igbUserAudio || isMine(v) || !userOn(v)) return;
     const want = cfg.mode === 'muted' ? null : Math.max(0, Math.min(1, (cfg.volume || 0) / 100));
     const ours = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
     if (!ours) { v.dataset.igbUserAudio = '1'; waiting.delete(v); }

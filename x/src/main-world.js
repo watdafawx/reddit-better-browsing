@@ -12,8 +12,20 @@
   const mutedDesc = Object.getOwnPropertyDescriptor(P, 'muted');
   const volDesc = Object.getOwnPropertyDescriptor(P, 'volume');
   const autoDesc = Object.getOwnPropertyDescriptor(P, 'autoplay');
-  const setMuted = (el, v) => mutedDesc.set.call(el, v);
-  const setVol = (el, v) => volDesc.set.call(el, v);
+  // Remember the audio state our own writes leave, so the volumechange they cause is never taken
+  // for the user's (that made a video we had to mute stay muted for good).
+  const mine = new WeakMap();
+  const note = el => mine.set(el, [mutedDesc.get.call(el), volDesc.get.call(el)]);
+  const setMuted = (el, v) => { mutedDesc.set.call(el, v); note(el); };
+  const setVol = (el, v) => { volDesc.set.call(el, v); note(el); };
+  const isMine = el => { const m = mine.get(el); return !!m && m[0] === el.muted && Math.abs(m[1] - el.volume) < 0.01; };
+  const activated = () => !!navigator.userActivation?.hasBeenActive;
+  // May this video make sound now? Unmuting a playing video when it may not makes the browser pause it,
+  // X then restarts it and the browser only lets it play muted: play, stop, play silent.
+  const canSound = el => {
+    try { if (navigator.getAutoplayPolicy) return navigator.getAutoplayPolicy(el) === 'allowed'; } catch {}
+    return activated();
+  };
 
   const PLAYER = '[data-testid="videoPlayer"]';
   let lastGesture = 0, lastTarget = null;
@@ -47,11 +59,14 @@
   // Videos that had to start muted because the browser blocked audible autoplay; unmute on first interaction.
   const waiting = new Set();
   const onGesture = e => {
+    // focus moves by script too (X focuses things itself): only a focus with user activation is yours
+    if (e.type === 'focusin' && !navigator.userActivation?.isActive) return;
     lastGesture = Date.now();
     lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
-    if (cfg.mode !== 'volume' || !level()) return;
+    if (cfg.mode !== 'volume' || !level() || !activated()) return;
     for (const v of waiting) {
-      if (v.isConnected && !v.paused && !v.dataset.xbbUserAudio) { setVol(v, level()); setMuted(v, false); }
+      if (v.isConnected && v.paused) continue;   // the playing handler unmutes it when it starts again
+      if (v.isConnected && !v.dataset.xbbUserAudio) { setVol(v, level()); setMuted(v, false); }
       waiting.delete(v);
     }
   };
@@ -62,6 +77,8 @@
     if (cfg.mode === 'muted') setMuted(el, true);
     else if (cfg.mode === 'volume' || cfg.mode === 'off') {
       setVol(el, level());
+      // a playing muted video stays muted until it may make sound (unmuting it now would pause it)
+      if (level() && el.muted && !el.paused && !canSound(el)) { waiting.add(el); return; }
       setMuted(el, !level());
     }
   }
@@ -82,7 +99,7 @@
       if (err && err.name === 'NotAllowedError' && !el.muted) {
         setMuted(el, true); // browser refuses sound before the first click: start muted, unmute on first gesture
         waiting.add(el);
-        return origPlay.call(el);
+        return origPlay.call(el).catch(e => { if (e?.name !== 'AbortError') throw e; });
       }
       throw err;
     });
@@ -118,11 +135,10 @@
 
   // React sets `muted` as a property on mount, before play(); re-apply our level when playback starts.
   // Before the page has had a click, unmuting would make the browser pause the video: wait for the click.
-  const activated = () => !!navigator.userActivation?.hasBeenActive;
   document.addEventListener('playing', e => {
     const v = e.target;
     if (!active(v)) return;
-    if (!activated() && v.muted && cfg.mode === 'volume') { waiting.add(v); return; }
+    if (v.muted && cfg.mode === 'volume' && !canSound(v)) { waiting.add(v); return; }
     if (waiting.has(v) && activated()) waiting.delete(v);
     if (!waiting.has(v)) applyAudio(v);
   }, true);
@@ -132,7 +148,7 @@
   setInterval(() => {
     if (cfg.mode !== 'volume' || !level() || document.hidden || !activated()) return;
     for (const v of document.querySelectorAll('video')) {
-      if (v.paused || !v.muted || v.dataset.xbbUserAudio || !active(v)) continue;
+      if (v.paused || !v.muted || v.dataset.xbbUserAudio || !active(v) || !canSound(v)) continue;
       waiting.delete(v);
       setVol(v, level());
       setMuted(v, false);
@@ -144,7 +160,7 @@
   // set (not a mute) becomes the level for the videos after it.
   document.addEventListener('volumechange', e => {
     const v = e.target;
-    if (!active(v) || v.dataset.xbbUserAudio || !userOn(v)) return;
+    if (!active(v) || v.dataset.xbbUserAudio || isMine(v) || !userOn(v)) return;
     const want = cfg.mode === 'muted' ? null : level();
     const same = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
     if (same) return;

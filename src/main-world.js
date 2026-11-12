@@ -8,8 +8,13 @@
   const origPlay = P.play;
   const mutedDesc = Object.getOwnPropertyDescriptor(P, 'muted');
   const volDesc = Object.getOwnPropertyDescriptor(P, 'volume');
-  const setMuted = (el, v) => mutedDesc.set.call(el, v);
-  const setVol = (el, v) => volDesc.set.call(el, v);
+  // Remember the audio state our own writes leave, so the volumechange they cause is never taken
+  // for the user's (that made a video we had to mute stay muted for good).
+  const mine = new WeakMap();
+  const note = el => mine.set(el, [mutedDesc.get.call(el), volDesc.get.call(el)]);
+  const setMuted = (el, v) => { mutedDesc.set.call(el, v); note(el); };
+  const setVol = (el, v) => { volDesc.set.call(el, v); note(el); };
+  const isMine = el => { const m = mine.get(el); return !!m && m[0] === el.muted && Math.abs(m[1] - el.volume) < 0.01; };
 
   let lastGesture = 0, lastTarget = null;
   const gesture = () => Date.now() - lastGesture < 1200 || !!(navigator.userActivation && navigator.userActivation.isActive && Date.now() - lastGesture < 5000);
@@ -28,6 +33,12 @@
     return false;
   };
   const activated = () => !!navigator.userActivation?.hasBeenActive;
+  // May this video make sound now? Unmuting a playing video when it may not makes the browser pause it,
+  // the page's player then restarts it and the browser only lets it play muted: play, stop, play silent.
+  const canSound = el => {
+    try { if (navigator.getAutoplayPolicy) return navigator.getAutoplayPolicy(el) === 'allowed'; } catch {}
+    return activated();
+  };
   // Parse the settings attribute only when it changes (the setters below run on every volume/mute write)
   let cfgCache = {};
   const readCfg = () => { try { cfgCache = JSON.parse(document.documentElement.dataset.rbeVideo || '{}'); } catch { cfgCache = {}; } };
@@ -42,10 +53,11 @@
     lastGesture = Date.now();
     lastTarget = e.type === 'keydown' ? (document.activeElement || e.target) : e.target;
     const c = cfg();
-    if (c.mode !== 'volume' || !c.volume) return;
+    if (c.mode !== 'volume' || !c.volume || !activated()) return;
     for (const v of waitingForGesture) {
       if (!v.isConnected) { waitingForGesture.delete(v); continue; }
-      if (!v.paused && !v.dataset.rbeUserAudio) { setVol(v, c.volume / 100); setMuted(v, false); }
+      if (v.paused) continue;               // the playing handler unmutes it when it starts again
+      if (!v.dataset.rbeUserAudio) { setVol(v, c.volume / 100); setMuted(v, false); }
       waitingForGesture.delete(v);
     }
   };
@@ -56,6 +68,8 @@
     if (c.mode === 'muted') setMuted(el, true);
     else if (c.mode === 'volume' || c.mode === 'off') {
       setVol(el, Math.max(0, Math.min(1, (c.volume || 0) / 100)));
+      // a playing muted video stays muted until it may make sound (unmuting it now would pause it)
+      if (c.volume && el.muted && !el.paused && !canSound(el)) { waitingForGesture.add(el); return; }
       setMuted(el, !c.volume);
     }
   }
@@ -88,7 +102,7 @@
       if (err && err.name === 'NotAllowedError' && !el.muted) {
         setMuted(el, true);                    // browser refuses sound before first click → start muted
         waitingForGesture.add(el);
-        return origPlay.call(el);
+        return origPlay.call(el).catch(e => { if (e?.name !== 'AbortError') throw e; });
       }
       throw err;
     });
@@ -136,7 +150,7 @@
   // player that differs from our level is the user's, and sticks.
   document.addEventListener('volumechange', e => {
     const v = e.target, c = cfg();
-    if (!active(v) || v.dataset.rbeUserAudio || !userOn(v)) return;
+    if (!active(v) || v.dataset.rbeUserAudio || isMine(v) || !userOn(v)) return;
     const want = c.mode === 'muted' ? null : Math.max(0, Math.min(1, (c.volume || 0) / 100));
     const ours = want === null ? v.muted : v.muted === (want === 0) && Math.abs(v.volume - want) < 0.01;
     if (!ours) { v.dataset.rbeUserAudio = '1'; waitingForGesture.delete(v); }
@@ -153,7 +167,7 @@
     const want = wantVol(c);
     for (const v of played) {
       if (!v.isConnected) { played.delete(v); continue; }
-      if (v.paused || v.dataset.rbeUserAudio || !active(v)) continue;
+      if (v.paused || v.dataset.rbeUserAudio || !active(v) || !canSound(v)) continue;
       if (!v.muted && Math.abs(v.volume - want) < 0.01) continue;
       waitingForGesture.delete(v);
       setVol(v, want);
