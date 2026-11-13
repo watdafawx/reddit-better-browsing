@@ -1,25 +1,12 @@
 /* Settings without leaving Instagram: a gear entry in Instagram's left sidebar and Alt+W, both opening
-   the popup's settings form in a panel over the page. (The userscript replaces IGB.openSettings
-   with its own shadow-DOM panel, since it has no extension pages.) */
+   the settings form in a panel over the page (IGB.openSettings, made in build.js with userscript/panel.js). */
 (() => {
-  const h = IGB.h;
   const LABEL = 'Better Browsing';
 
-  // Extension: the popup page itself, in an iframe
-  let panel = null;
-  IGB.openSettings ??= function toggle() {
-    if (panel) { panel.remove(); panel = null; return; }
-    panel = h('div', { class: 'igb-root igb-settings', onclick: e => { if (e.target === panel) toggle(); } },
-      h('div', { class: 'igb-settings-box' },
-        h('button', { class: 'igb-settings-x', title: 'Close (Esc)', onclick: toggle }, '✕'),
-        h('iframe', { src: IGB.api.runtime.getURL('popup/popup.html'), title: 'Instagram Better Browsing settings' })));
-    document.body.append(panel);
-  };
-  IGB.settingsOpen = () => !!(panel || document.querySelector('.igb-settings'));
+  IGB.settingsOpen = () => !!document.querySelector('.igb-settings');
 
   addEventListener('keydown', e => {
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyW') { e.preventDefault(); e.stopPropagation(); IGB.openSettings(); }
-    else if (e.key === 'Escape' && IGB.settingsOpen()) { e.stopPropagation(); IGB.openSettings(); }
   }, true);
 
   // ---------- sidebar entry ----------

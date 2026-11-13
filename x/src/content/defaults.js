@@ -1,6 +1,5 @@
 /* X Better Browsing: shared defaults (loaded by content scripts and the popup) */
 var XBB = globalThis.XBB || (globalThis.XBB = {});
-XBB.api = globalThis.browser ?? globalThis.chrome;
 
 XBB.DEFAULTS = {
   // Video

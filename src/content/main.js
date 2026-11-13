@@ -115,15 +115,5 @@
     if (k === 'n' || code === 'KeyN') { e.preventDefault(); RBE.cycleNsfw(); }
     else if (k === 'v' || code === 'KeyV') { e.preventDefault(); RBE.cycleVideo(); }
     else if (k === 's' || code === 'KeyS') { e.preventDefault(); RBE.toggleSpoilers(); }
-    else if (k === 'a' || code === 'KeyA') { e.preventDefault(); RBE.openAccountMenu(); }
   }, true);
-
-  // ---------- messages from the popup ----------
-  RBE.api.runtime.onMessage.addListener((msg, _sender, reply) => {
-    if (msg.type === 'rbe:revealAll') { RBE.revealAll(true); reply({ ok: true }); }
-    else if (msg.type === 'rbe:me') { RBE.accounts.me().then(name => reply({ name })); return true; }
-    else if (msg.type === 'rbe:switch') { RBE.accounts.switchTo(msg.name, true).then(() => reply({ ok: true }), err => reply({ error: err.message })); return true; }
-    else if (msg.type === 'rbe:add') { RBE.accounts.addAnother(true).then(() => reply({ ok: true }), err => reply({ error: err.message })); return true; }
-    else if (msg.type === 'rbe:save') { RBE.accounts.saveCurrent().then(name => reply({ name }), err => reply({ error: err.message })); return true; }
-  });
 })();

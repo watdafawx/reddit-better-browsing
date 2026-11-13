@@ -1,17 +1,16 @@
-// Offline smoke test: loads dist/chrome into Chromium and answers every reddit.com request from
-// fixtures below, so it never touches live Reddit. Run: npm test (after npm run build).
+// Offline smoke test: runs the userscript (dist/better-browsing.user.js) in Chromium and answers every
+// reddit.com request from fixtures below, so it never touches live Reddit. Run: npm test.
+// The second part runs it again in BROWSER (chromium, or firefox) for the panel, perf and away checks.
 import { chromium, firefox } from 'playwright';
 import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
 import { awayChecks, awayOk } from './lib/away.mjs';
-import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
+import path from 'path'; import fs from 'fs';
 
-const ext = path.resolve(process.argv[2] || 'dist/chrome');
-const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'rbe-'));
-const ctx = await chromium.launchPersistentContext(prof, {
-  headless: false,
-  args: ['--headless=new', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
-  viewport: { width: 1400, height: 900 },
-});
+const usFile = path.resolve('dist/better-browsing.user.js');
+if (!fs.existsSync(usFile)) { console.log('FAIL userscript built: ' + usFile + ' missing (npm run build)'); process.exit(1); }
+const b1 = await chromium.launch();
+const ctx = await b1.newContext({ viewport: { width: 1400, height: 900 } });
+await ctx.addInitScript({ path: usFile });
 
 const post = (id, extra = {}) => ({ name: 't3_' + id, id, title: 'Post ' + id, author: 'alice', author_fullname: 't2_a', subreddit: 'test',
   subreddit_name_prefixed: 'r/test', permalink: `/r/test/comments/${id}/post_${id}/`, created_utc: Date.now() / 1000 - 3600, score: 42, num_comments: 3,
@@ -58,8 +57,8 @@ const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || /RBE/.test(m.text())) logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + e.message));
 page.on('dialog', d => { logs.push('[DIALOG!] ' + d.message()); d.dismiss(); });
-const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
-sw.on('console', m => logs.push('[sw] ' + m.text()));
+// settings written the way the panel writes them (read-modify-write of storage.sync `settings`)
+const setSetting = (key, value) => page.evaluate(([k, v]) => RBE.api.storage.sync.get('settings').then(({ settings = {} }) => RBE.api.storage.sync.set({ settings: { ...settings, [k]: v } })), [key, value]);
 
 const r = {};
 await page.goto('https://www.reddit.com/r/test/');
@@ -130,14 +129,14 @@ r.reopenReqs = reqs.slice(n2).filter(q => /comments/.test(q.u)).length;
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 
-// video post → hls.js injected on demand, attaches MediaSource (blob:)
+// video post → hls.js runs on demand, attaches MediaSource (blob:)
 const v = await page.locator('shreddit-post#t3_vvv').boundingBox();
 await page.mouse.click(v.x + 200, v.y + 100);
 await page.waitForSelector('.rbe-viewer video', { timeout: 10000 });
 await page.waitForTimeout(2500);
 r.video = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'); return { src: (el.currentSrc || el.getAttribute('src') || '').slice(0, 30), vol: el.volume, muted: el.muted, controls: el.controls }; });
 // the controls toggle applies live; with it off a click plays/pauses
-const setNative = on => sw.evaluate(on => chrome.storage.sync.get('settings').then(({ settings = {} }) => chrome.storage.sync.set({ settings: { ...settings, nativeControls: on } })), on);
+const setNative = on => setSetting('nativeControls', on);
 await setNative(false);
 await page.waitForTimeout(500);
 r.nativeOff = await page.evaluate(() => { const el = document.querySelector('.rbe-viewer video'), e = new MouseEvent('click', { bubbles: true, cancelable: true }); el.dispatchEvent(e); return { controls: el.controls, handled: e.defaultPrevented }; });   // our click-to-toggle took it
@@ -201,33 +200,21 @@ r.lbPause = await page.evaluate(() => {
 });
 
 // settings change through storage reaches the page (filtered onChanged)
-await sw.evaluate(() => chrome.storage.sync.get('settings').then(({ settings = {} }) => chrome.storage.sync.set({ settings: { ...settings, theme: 'nord' } })));
+await setSetting('theme', 'nord');
 await page.waitForTimeout(500);
 r.themeApplied = await page.evaluate(() => document.documentElement.classList.contains('rbe-themed'));
-await sw.evaluate(() => chrome.storage.local.set({ accounts: { x: { savedAt: 1, cookies: [] } } }));
-await page.waitForTimeout(300);
 
 // reload: snapshot gives theme before storage read
 await page.reload();
 r.themedAtDomStart = await page.evaluate(() => document.documentElement.classList.contains('rbe-themed'));
 
-// extension popup still mounts the settings form (popup.js is shared with the userscript panel)
-const idSrc = process.platform === 'win32' ? Buffer.from(ext, 'utf16le') : Buffer.from(ext);
-const extId = [...crypto.createHash('sha256').update(idSrc).digest('hex').slice(0, 32)].map(c => String.fromCharCode(97 + parseInt(c, 16))).join('');
-const pop = await ctx.newPage();
-await pop.goto(`chrome-extension://${extId}/popup/popup.html`).catch(() => {});
-await pop.waitForTimeout(600);
-r.popup = await pop.evaluate(() => ({ themes: document.querySelectorAll('#themes .theme').length, accounts: !!document.querySelector('[data-tab="accounts"]'), checked: [...document.querySelectorAll('input[type=checkbox][data-key]')].some(i => i.checked) })).catch(e => ({ err: e.message }));
-
 r.logs = logs;
-await ctx.close();
-fs.rmSync(prof, { recursive: true, force: true });
+await b1.close();
 
-// ---------- the combined userscript (dist/better-browsing.user.js), no extension ----------
-const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
-r.us = { built: fs.existsSync(usFile) };
-if (r.us.built) {
-  // BROWSER=firefox runs the userscript part in Firefox (the extension part above can only load in Chromium)
+// ---------- settings panel, lightbox, perf and away checks, in BROWSER ----------
+r.us = { built: true };
+{
+  // BROWSER=firefox runs this part in Firefox (the part above always runs in Chromium)
   const FF = process.env.BROWSER === 'firefox', bt = FF ? firefox : chromium;
   const launchOpts = FF ? { firefoxUserPrefs: { 'media.autoplay.default': 0 } } : {};
   r.us.browser = FF ? 'firefox' : 'chromium';
@@ -321,7 +308,6 @@ const checks = {
   'Discord button added next to Share in feed posts': r.feedEmbed && /redditez\.com\/r\/test\/comments\/ccc\//.test(r.feedEmbedCopied) && r.feedEmbedNoViewer,
   'Discord link button copies redditez.com permalink': /^https:\/\/redditez\.com\/r\/[^/]+\/comments\/[a-z0-9]+\//.test(r.embed?.copied || '') && r.embed.inPost,
   'no page errors or dialogs': !logs.some(l => /pageerror|DIALOG/.test(l)),
-  'extension popup mounts settings form': r.popup.themes > 3 && r.popup.accounts && r.popup.checked,
   'userscript: theme, quick bar, gear; no accounts button': r.us.built && r.us.theme && r.us.css && r.us.quickbar && r.us.gear && !r.us.accountsBtn && /"mode":"volume"/.test(r.us.videoAttr),
   'userscript: viewer and comments': r.us.comments === 61,
   'userscript: hls.js loads on first video, volume applied': r.us.hlsBefore === false && r.us.hlsAfter === true && r.us.vol === 0.1,

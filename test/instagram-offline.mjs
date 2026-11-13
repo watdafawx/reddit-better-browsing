@@ -1,18 +1,16 @@
-// Offline smoke test for the Instagram extension: loads dist/instagram-chrome into Chromium and answers
-// every instagram.com / cdn request from fixtures below, so it never touches live Instagram.
-// Run: npm run test:instagram (after npm run build).
+// Offline smoke test for the Instagram part of the userscript: runs dist/better-browsing.user.js in Chromium
+// and answers every instagram.com / cdn request from fixtures below, so it never touches live Instagram.
+// The last part runs it again in BROWSER (chromium, or firefox). Run: npm run test:instagram.
 import { chromium, firefox } from 'playwright';
 import { idleMutations, churnCost, costOk } from './lib/perf.mjs';
 import { awayChecks, awayOk } from './lib/away.mjs';
-import os from 'os'; import path from 'path'; import fs from 'fs'; import crypto from 'crypto';
+import path from 'path'; import fs from 'fs';
 
-const ext = path.resolve(process.argv[2] || 'dist/instagram-chrome');
-const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'igb-'));
-const ctx = await chromium.launchPersistentContext(prof, {
-  headless: false,
-  args: ['--headless=new', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--autoplay-policy=no-user-gesture-required'],
-  viewport: { width: 1400, height: 900 },
-});
+const usFile = path.resolve('dist/better-browsing.user.js');
+if (!fs.existsSync(usFile)) { console.log('FAIL  userscript built: ' + usFile + ' missing (npm run build)'); process.exit(1); }
+const b1 = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const ctx = await b1.newContext({ viewport: { width: 1400, height: 900 } });
+await ctx.addInitScript({ path: usFile });
 
 // ---------- fixtures ----------
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -435,12 +433,9 @@ await page.waitForSelector('.igb-gear', { timeout: 3000 }).catch(() => {});
 const gear = await page.evaluate(() => { const g = document.querySelector('.igb-gear'); return g && { text: g.querySelector('a > span').textContent, last: g === g.parentElement.lastElementChild, href: g.querySelector('a').getAttribute('href'), svg: g.querySelector('svg title')?.textContent }; });
 check('sidebar gear entry cloned from Search', gear?.text === 'Better Browsing' && gear.last && gear.href === '#' && gear.svg === 'Better Browsing', gear);
 await page.click('.igb-gear a');
-await page.waitForSelector('.igb-settings iframe', { timeout: 3000 }).catch(() => {});
-let frame = null;
-for (let i = 0; i < 30 && !frame; i++) { frame = page.frames().find(f => f.url().endsWith('/popup/popup.html')); if (!frame) await page.waitForTimeout(100); }
-if (frame) await frame.waitForSelector('[data-key="settingsGear"]', { timeout: 3000 }).catch(() => {});
-const fInputs = frame ? await frame.locator('[data-key]').count() : 0;
-check('gear opens settings panel (popup in iframe)', fInputs === 18 && page.url().endsWith('/'), { fInputs, url: page.url() });
+await page.waitForSelector('.igb-settings', { timeout: 3000 }).catch(() => {});
+const fInputs = await page.evaluate(() => document.querySelector('.igb-settings')?.shadowRoot?.querySelectorAll('[data-key]').length || 0);
+check('gear opens settings panel', fInputs === 18 && page.url().endsWith('/'), { fInputs, url: page.url() });
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 const escP = await page.$('.igb-settings');
@@ -451,24 +446,23 @@ await page.keyboard.press('Alt+W');
 await page.waitForTimeout(200);
 check('Esc closes, Alt+W toggles panel', !escP && !!altP && !(await page.$('.igb-settings')), { esc: !!escP, alt: !!altP });
 
-// ---------- popup → live settings change ----------
-// Unpacked extension id = sha256 of its path (UTF-16LE on Windows), first 32 hex digits mapped to a-p
-const idSrc = process.platform === 'win32' ? Buffer.from(ext, 'utf16le') : Buffer.from(ext);
-const extId = [...crypto.createHash('sha256').update(idSrc).digest('hex').slice(0, 32)].map(c => String.fromCharCode(97 + parseInt(c, 16))).join('');
-const pop = await ctx.newPage();
+// ---------- settings panel → live settings change ----------
 try {
-  await pop.goto(`chrome-extension://${extId}/popup/popup.html`);
-  await pop.selectOption('select[data-key="videoMode"]', 'muted');
+  await page.keyboard.press('Alt+W');
+  await page.waitForSelector('.igb-settings', { timeout: 3000 });
+  await page.locator('.igb-settings select[data-key="videoMode"]').selectOption('muted');
   await page.waitForTimeout(600);
   const attr = await page.evaluate(() => document.documentElement.dataset.igbVideo);
-  check('popup change reaches open page', /"mode":"muted"/.test(attr), attr);
+  check('settings change reaches the page', /"mode":"muted"/.test(attr), attr);
 
   // Embed domain: a picker like the Reddit one, and the link button follows it
-  await pop.fill('input[data-key="embedHost"]', 'vxinstagram.com');
-  await pop.locator('input[data-key="embedHost"]').dispatchEvent('change');
+  await page.locator('.igb-settings input[data-key="embedHost"]').fill('vxinstagram.com');
+  await page.locator('.igb-settings input[data-key="embedHost"]').dispatchEvent('change');
   await page.waitForTimeout(600);
-  const hostSaved = await pop.evaluate(() => chrome.storage.sync.get('settings').then(({ settings = {} }) => settings.embedHost));
-  const hostOptions = await pop.locator('#igb-embed-hosts option').count();
+  const hostSaved = await page.evaluate(() => IGB.api.storage.sync.get('settings').then(({ settings = {} }) => settings.embedHost));
+  const hostOptions = await page.locator('.igb-settings #igb-embed-hosts option').count();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
   await page.bringToFront();
   await page.mouse.move(5, 5);
   await page.waitForTimeout(300);
@@ -480,13 +474,12 @@ try {
   const clip2 = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
   check('embed domain picker changes the copied link', hostSaved === 'vxinstagram.com' && hostOptions === 4 && /^https:\/\/vxinstagram\.com\/reel\/VIDEOBBBBBB\//.test(clip2), { hostSaved, hostOptions, clip2 });
 } catch (e) {
-  check('popup change reaches open page', false, 'popup not reachable: ' + e.message);
+  check('settings change reaches the page', false, 'panel not reachable: ' + e.message);
 }
 
-// ---------- userscript build, no extension ----------
-const usFile = path.resolve(path.dirname(ext), 'better-browsing.user.js');
-if (fs.existsSync(usFile)) {
-  // BROWSER=firefox runs the userscript part in Firefox (the extension part above can only load in Chromium)
+// ---------- again in BROWSER: panel, perf and away checks ----------
+{
+  // BROWSER=firefox runs this part in Firefox (the part above always runs in Chromium)
   const FF = process.env.BROWSER === 'firefox', bt = FF ? firefox : chromium, bname = FF ? 'firefox' : 'chromium';
   const launchOpts = FF ? { firefoxUserPrefs: { 'media.autoplay.default': 0 } } : { args: ['--autoplay-policy=no-user-gesture-required'] };
   const b2 = await bt.launch(launchOpts);
@@ -522,7 +515,7 @@ if (fs.existsSync(usFile)) {
   await b2.close();
   const cost = await churnCost({ browserType: bt, name: bname, launchOpts, route: { re: /instagram\.com|example\.test/, fn: fixtures }, url: 'https://www.instagram.com/', usFile });
   check('userscript: on a page that keeps changing, the script adds little work (' + bname + ')', costOk(bname, cost), cost);
-} else check('userscript: built', false, usFile + ' missing');
+}
 
 let fails = 0;
 for (const [k, v] of Object.entries(ok)) {
@@ -530,6 +523,5 @@ for (const [k, v] of Object.entries(ok)) {
   console.log(`${v ? 'PASS' : 'FAIL'}  ${k}${v ? '' : '  ' + JSON.stringify(r[k])}`);
 }
 if (logs.length) console.log('\nconsole:\n' + logs.join('\n'));
-await ctx.close();
-fs.rmSync(prof, { recursive: true, force: true });
+await b1.close();
 process.exit(fails ? 1 : 0);

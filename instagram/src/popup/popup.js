@@ -1,5 +1,5 @@
 /* Settings form: every [data-key] input maps to one key of storage.sync `settings`.
-   The popup mounts it on its own document; the userscript mounts it inside an in-page panel. */
+   Mounted by the userscript's settings panel (userscript/panel.js) on its shadow root. */
 IGB.mountSettings = async function (root) {
   const inputs = [...root.querySelectorAll('[data-key]')];
   const s = await IGB.loadSettings();
@@ -27,4 +27,3 @@ IGB.mountSettings = async function (root) {
     save(el.dataset.key, v);
   });
 };
-if (location.protocol.endsWith('extension:')) IGB.mountSettings(document);

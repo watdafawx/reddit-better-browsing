@@ -1,14 +1,12 @@
 /* Settings without leaving X: a gear entry in X's left sidebar and Alt+W, both opening the settings
-   form in a panel over the page (XBB.openSettings, defined in userscript/panel.js). */
+   form in a panel over the page (XBB.openSettings, made in build.js with userscript/panel.js). */
 (() => {
   const LABEL = 'Better Browsing';
 
-  // XBB.openSettings (toggle the panel) comes from userscript/panel.js
   XBB.settingsOpen = () => !!document.querySelector('.xbb-settings');
 
   addEventListener('keydown', e => {
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyW') { e.preventDefault(); e.stopPropagation(); XBB.openSettings(); }
-    else if (e.key === 'Escape' && XBB.settingsOpen()) { e.stopPropagation(); XBB.openSettings(); }
   }, true);
 
   // ---------- sidebar entry ----------

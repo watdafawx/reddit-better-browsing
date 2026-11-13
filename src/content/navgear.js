@@ -1,4 +1,4 @@
-/* Settings gear in Reddit's top nav bar: opens the extension settings in a panel over the page */
+/* Settings gear in Reddit's top nav bar: opens the settings panel over the page */
 (() => {
   const h = (...a) => RBE.h(...a);
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -20,35 +20,8 @@
     return svg;
   }
 
-  // ---------- settings panel ----------
-  let panel = null;
-  function closePanel() {
-    if (!panel) return;
-    panel.remove(); panel = null;
-    window.removeEventListener('keydown', onKey, true);
-    gear?.classList.remove('on');
-  }
-  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closePanel(); } }
-  function openPanel(anchor) {
-    if (RBE.openSettingsInPage) return RBE.openSettingsInPage();   // userscript: no extension page to frame
-    if (panel) return closePanel();
-    const frame = h('iframe', { class: 'rbe-settings-frame', src: RBE.api.runtime.getURL('popup/popup.html?embed=1'), title: 'Reddit Better Browsing settings' });
-    const box = h('div', { class: 'rbe-settings-box' }, frame);
-    panel = h('div', { class: 'rbe-root rbe-settings-ov' }, box);
-    panel.addEventListener('click', e => { if (e.target === panel) closePanel(); });
-    // place under the gear, kept on screen
-    const r = anchor ? anchor.getBoundingClientRect() : null;
-    if (r && r.bottom > 0) {
-      box.style.top = Math.round(r.bottom + 8) + 'px';
-      box.style.right = Math.max(8, Math.round(window.innerWidth - r.right - 8)) + 'px';
-    } else {
-      box.style.top = '64px'; box.style.right = '16px';
-    }
-    document.documentElement.append(panel);
-    window.addEventListener('keydown', onKey, true);
-    gear?.classList.add('on');
-  }
-  RBE.openSettingsPanel = () => openPanel(gear && gear.isConnected ? gear : null);
+  // the panel itself: RBE.openSettingsInPage, made in build.js with userscript/panel.js
+  RBE.openSettingsPanel = () => RBE.openSettingsInPage?.();
 
   // ---------- gear button in the nav bar ----------
   let gear = null;
@@ -57,7 +30,7 @@
     b.append(gearIcon());
     // keep Reddit's header handlers (menus that open on pointer/mouse down) from seeing our clicks
     ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'touchstart'].forEach(t => b.addEventListener(t, e => e.stopPropagation()));
-    b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openPanel(b); });
+    b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); RBE.openSettingsPanel(); });
     return b;
   }
 

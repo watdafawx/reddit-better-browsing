@@ -1,6 +1,5 @@
 /* Instagram Better Browsing: shared defaults (loaded by content scripts and the popup) */
 var IGB = globalThis.IGB || (globalThis.IGB = {});
-IGB.api = globalThis.browser ?? globalThis.chrome;
 
 IGB.DEFAULTS = {
   // Video

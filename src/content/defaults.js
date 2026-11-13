@@ -1,6 +1,5 @@
 /* Reddit Better Browsing — shared defaults (loaded by content scripts and popup) */
 var RBE = globalThis.RBE || (globalThis.RBE = {});
-RBE.api = globalThis.browser ?? globalThis.chrome;
 
 RBE.DEFAULTS = {
   // Post viewer

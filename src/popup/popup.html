@@ -18,7 +18,6 @@
   <button data-tab="video">Video</button>
   <button data-tab="filters">Filters</button>
   <button data-tab="look">Look</button>
-  <button data-tab="accounts">Accounts</button>
 </nav>
 
 <main>
@@ -129,15 +128,6 @@
   <div class="split"><button id="exportBtn" class="link">Export settings</button><button id="importBtn" class="link">Import settings</button><button id="resetBtn" class="link danger">Reset all</button></div>
 </section>
 
-<section data-panel="accounts">
-  <p id="acctStatus" class="hint">Open a Reddit tab to manage accounts.</p>
-  <div id="acctList"></div>
-  <button id="acctSave" class="btn" hidden>Save current account</button>
-  <button id="acctAdd" class="btn ghost">Log in another account</button>
-  <p class="hint">How it works: log in normally, then save. Switching swaps Reddit's login cookies — no passwords are stored. Saved sessions stay on this computer; logging out on Reddit ends that saved session. <kbd>Alt</kbd>+<kbd>A</kbd> opens the switcher on the page.</p>
-</section>
 </main>
-<script src="../content/defaults.js"></script>
-<script src="popup.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 // Offline smoke test for the X part of the userscript: loads dist/better-browsing.user.js into plain Chromium
-// (no extension) and answers every x.com request from fixtures below, so it never touches live X.
+// and answers every x.com request from fixtures below, so it never touches live X.
 // Run: npm run test:x
 import { chromium, firefox } from 'playwright';
 import path from 'path'; import fs from 'fs';

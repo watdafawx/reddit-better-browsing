@@ -1,6 +1,6 @@
 # X Better Browsing
 
-Part of the one userscript (`dist/better-browsing.user.js`) for x.com. There is no browser extension for X: `x/manifest.base.json` only lists the scripts `build.js` puts into the userscript, in load order, and holds this part's version. It replaces these older single-purpose scripts: *Native Media Controls with autoplay*, *X - Auto unmute videos*, *One Click Copy Link Button for Twitter(X)*, *Retweet in one click & Like+Retweet* and the video part of *X.com Heavy JS Optimizer+*.
+Part of the one userscript (`dist/better-browsing.user.js`) for x.com. `x/manifest.base.json` lists the scripts `build.js` puts into the userscript, in load order, and holds this part's version. It replaces these older single-purpose scripts: *Native Media Controls with autoplay*, *X - Auto unmute videos*, *One Click Copy Link Button for Twitter(X)*, *Retweet in one click & Like+Retweet* and the video part of *X.com Heavy JS Optimizer+*.
 
 ## Features
 

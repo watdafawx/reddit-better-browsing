@@ -1,71 +1,15 @@
 {
-  "manifest_version": 3,
   "name": "Reddit Better Browsing",
-  "version": "1.3.11",
-  "description": "Read posts and comments without leaving the feed, a better image viewer, video autoplay/volume control, spoiler & NSFW filters, account switching and themes.",
-  "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "action": {
-    "default_popup": "popup/popup.html",
-    "default_title": "Reddit Better Browsing",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png"
-    }
-  },
-  "options_ui": {
-    "page": "popup/popup.html",
-    "open_in_tab": true
-  },
-  "permissions": [
-    "storage",
-    "cookies",
-    "scripting"
-  ],
-  "host_permissions": [
-    "*://*.reddit.com/*",
-    "*://*.redd.it/*"
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "popup/*",
-        "icons/*",
-        "content/defaults.js"
-      ],
-      "matches": [
-        "*://*.reddit.com/*"
-      ]
-    }
-  ],
+  "version": "1.3.12",
+  "description": "Reddit part of the userscript. This file lists the scripts build.js puts into dist/better-browsing.user.js, in load order (main-world files first, then content scripts and CSS), and holds the Reddit part's version (bump package.json's together with it).",
   "content_scripts": [
     {
-      "matches": [
-        "*://*.reddit.com/*"
-      ],
-      "exclude_matches": [
-        "*://old.reddit.com/*",
-        "*://*.reddit.com/media*",
-        "*://*.reddit.com/login*"
-      ],
       "js": [
         "main-world.js"
       ],
-      "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": [
-        "*://*.reddit.com/*"
-      ],
-      "exclude_matches": [
-        "*://old.reddit.com/*",
-        "*://*.reddit.com/media*"
-      ],
       "js": [
         "content/defaults.js",
         "content/core.js",
@@ -81,8 +25,7 @@
       ],
       "css": [
         "content/content.css"
-      ],
-      "run_at": "document_start"
+      ]
     }
   ]
 }

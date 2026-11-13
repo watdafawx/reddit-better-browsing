@@ -1,17 +1,15 @@
 {
-  "manifest_version": 3,
   "name": "X Better Browsing",
-  "version": "1.0.3",
-  "description": "Userscript only (no browser extension is built for X). This file lists the scripts build.js puts into dist/better-browsing.user.js, in load order, and holds the X part's version.",
+  "version": "1.0.4",
+  "description": "X part of the userscript. This file lists the scripts build.js puts into dist/better-browsing.user.js, in load order, and holds the X part's version.",
   "content_scripts": [
     {
-      "matches": ["*://x.com/*"],
-      "js": ["main-world.js"],
-      "run_at": "document_start",
+      "js": [
+        "main-world.js"
+      ],
       "world": "MAIN"
     },
     {
-      "matches": ["*://x.com/*"],
       "js": [
         "content/defaults.js",
         "content/core.js",
@@ -19,8 +17,9 @@
         "content/tweet.js",
         "content/settings.js"
       ],
-      "css": ["content/content.css"],
-      "run_at": "document_start"
+      "css": [
+        "content/content.css"
+      ]
     }
   ]
 }

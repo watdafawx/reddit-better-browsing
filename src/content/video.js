@@ -94,12 +94,12 @@
     io.observe(v);
   };
 
-  // hls.js (~400 KB) is loaded on first use by asking the background to inject it into this tab.
+  // hls.js (~400 KB) runs on first use: build.js wraps it in the function RBE_LOAD_HLS.
   let hlsLoad = null;
   RBE.loadHls = () => {
     if (globalThis.Hls) return Promise.resolve(true);
-    return hlsLoad || (hlsLoad = RBE.api.runtime.sendMessage({ type: 'rbe:loadHls' })
-      .then(r => { if (r?.error) console.warn('[RBE] hls.js load failed', r.error); return !!globalThis.Hls; }, () => false)
+    return hlsLoad || (hlsLoad = Promise.resolve().then(() => RBE_LOAD_HLS())
+      .then(() => !!globalThis.Hls, e => { console.warn('[RBE] hls.js load failed', e); return false; })
       .then(ok => { if (!ok) hlsLoad = null; return ok; }));
   };
 

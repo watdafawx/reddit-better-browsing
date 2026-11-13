@@ -1,17 +1,16 @@
-// Runs every test: the three sites in Chromium, and the userscript (the release) of each in Firefox too.
-// The Reddit and Instagram extension builds can only be loaded in Chromium, so their runs in "firefox"
-// mode repeat that part in Chromium and run the userscript part in Firefox. Run: npm run test:all
+// Runs every test: the userscript on each site in Chromium, and again in Firefox. The Reddit and Instagram
+// tests run their first part in Chromium either way and only their second part in BROWSER. Run: npm run test:all
 import { spawnSync } from 'child_process';
 
 const node = (...args) => ['node', args];
 const runs = [
-  ['build (userscript + test extensions)', ...node('build.js', '--extensions')],
+  ['build', ...node('build.js')],
   ['X, Chromium', ...node('test/x-offline.mjs')],
   ['X, Firefox', ...node('test/x-offline.mjs'), { BROWSER: 'firefox' }],
-  ['Reddit, Chromium (extension + userscript)', ...node('test/offline.mjs', 'dist/chrome')],
-  ['Reddit userscript, Firefox', ...node('test/offline.mjs', 'dist/chrome'), { BROWSER: 'firefox' }],
-  ['Instagram, Chromium (extension + userscript)', ...node('test/instagram-offline.mjs', 'dist/instagram-chrome')],
-  ['Instagram userscript, Firefox', ...node('test/instagram-offline.mjs', 'dist/instagram-chrome'), { BROWSER: 'firefox' }],
+  ['Reddit, Chromium', ...node('test/offline.mjs')],
+  ['Reddit, Firefox', ...node('test/offline.mjs'), { BROWSER: 'firefox' }],
+  ['Instagram, Chromium', ...node('test/instagram-offline.mjs')],
+  ['Instagram, Firefox', ...node('test/instagram-offline.mjs'), { BROWSER: 'firefox' }],
 ];
 
 let bad = 0;
